@@ -1,13 +1,20 @@
-##CANbus Library for Teensy 3.1
+##CANbus Library for Teensy 3.1, 3.2 and 3.6
 
 ###Introduction
-FlexCAN is a serial communication driver for the CAN0 peripheral built into the Teensy 3.1 CPU.  The driver is organized in the Arduino library format.
+FlexCAN is a serial communication driver for the CAN peripherial built into the Teensy CPUs. Versions 3.1 and 3.2 of the board support single CAN0 controller while version 3.6 supports dual CAN0/CAN1 controllers.  The driver is organized in the Arduino library format.
 
-When the FlexCAN object is constructed, Arduino pins Digital 3 and Digital 4 are assigned to CAN functions TX and RX.  These should be wired to a 3.3V CAN transceiver TXD and RXD respectively to allow connection of the Teensy 3.1 to a CAN network.
+When the FlexCAN object is constructed on Teensy 3.1/3.2, Arduino pins Digital 3 and Digital 4 are assigned to CAN functions TX and RX.
 
-![Teensy 3.1 CAN Pins, Digital3=TX, Digital4=RX](/FlexCAN_pins.png)
+![Teensy 3.1/3.2 CAN Pins, Digital3=TX, Digital4=RX](/FlexCAN_pins.png)
 
-Even though the Teensy is operating on 3.3V, use of 5V transceivers may be an option if the system has regulated +5V available.  The CAN RXD input on the CPU is 5V tolerant and most 5V transceivers will accept the 3V TXD signal.  This is a good choice for breadboarding due to availability of thru-hole 5V transceiver parts.
+On Teensy 3.6 it is possible to to specify the **id** parameter and select whether CAN0 or CAN1 shall be used. For CAN0 Arduino pins Digital 3 and Digital 4 are assigned to CAN functions TX and RX. For CAN1 Arduino pins Digital 34 and Digital 33 are assigned to CAN functions TX and RX.
+
+![Teensy 3.6 CAN Pins, CAN0: Digital3=TX and Digital4=RX, CAN1: Digital34=TX and Digital33=RX](/FlexCAN_pins_36.png)
+
+CAN RX and TX pins should be wired to a 3.3V CAN transceiver TXD and RXD respectively to allow connection of the Teensy 3.1/3.2/3.6 to a CAN network.
+
+Even though the Teensy 3.1/3.2 is operating on 3.3V, use of 5V transceivers may be an option if the system has regulated +5V available.  The CAN RXD input on the CPU is 5V tolerant and most 5V transceivers will accept the 3V TXD signal.  This is a good choice for breadboarding due to availability of thru-hole 5V transceiver parts.
+**In case of Teensy 3.6 the digital pins are not 5V tolerant, so 3.3V transceivers must be used!**
 
 Note that CAN will normally require termination resistors.  These are located at the two ends of a CAN bus to prevent reflections.  Do not add more terminators when connecting devices to an existing properly terminated CAN bus.
 
