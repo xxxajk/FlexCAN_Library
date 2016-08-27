@@ -1,6 +1,7 @@
 // -------------------------------------------------------------
 // a simple Arduino Teensy3.1 CAN driver
 // by teachop
+// dual CAN support for MK66FX1M0 by Pawelsky
 //
 #ifndef __FLEXCAN_H__
 #define __FLEXCAN_H__
@@ -26,9 +27,10 @@ class FlexCAN
 {
 private:
   struct CAN_filter_t defaultMask;
+  uint32_t flexcanBase;
 
 public:
-  FlexCAN(uint32_t baud = 125000);
+  FlexCAN(uint32_t baud = 125000, uint8_t id = 0);
   void begin(const CAN_filter_t &mask);
   inline void begin()
   {
