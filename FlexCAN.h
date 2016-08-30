@@ -1,5 +1,5 @@
 // -------------------------------------------------------------
-// a simple Arduino Teensy3.1 CAN driver
+// a simple Arduino Teensy 3.1/3.2/3.6 CAN driver
 // by teachop
 // dual CAN support for MK66FX1M0 by Pawelsky
 //

@@ -1,5 +1,5 @@
 // -------------------------------------------------------------
-// a simple Arduino Teensy3.1 CAN driver
+// a simple Arduino Teensy 3.1/3.2/3.6 CAN driver
 // by teachop
 // dual CAN support for MK66FX1M0 by Pawelsky
 //
@@ -14,7 +14,6 @@ static const int rxb = 0;
 #define FLEXCANb_CTRL1(b)                 (*(vuint32_t*)(b+4))
 #define FLEXCANb_RXMGMASK(b)              (*(vuint32_t*)(b+0x10))
 #define FLEXCANb_IFLAG1(b)                (*(vuint32_t*)(b+0x30))
-#define FLEXCANb_CTRL2(b)                 (*(vuint32_t*)(b+0x34))
 #define FLEXCANb_RXFGMASK(b)              (*(vuint32_t*)(b+0x48))
 #define FLEXCANb_MBn_CS(b, n)             (*(vuint32_t*)(b+0x80+n*0x10))
 #define FLEXCANb_MBn_ID(b, n)             (*(vuint32_t*)(b+0x84+n*0x10))
@@ -40,7 +39,7 @@ FlexCAN::FlexCAN(uint32_t baud, uint8_t id)
 #ifdef __MK66FX1M0__
   else if(flexcanBase == FLEXCAN1_BASE)
   {
-    // 33=PTA12=CAN1_RX, 34=PTA13=CAN1_TX
+    // 33=PTE24=CAN1_TX, 34=PTE25=CAN1_RX
     CORE_PIN33_CONFIG = PORT_PCR_MUX(2);
     CORE_PIN34_CONFIG = PORT_PCR_MUX(2);// | PORT_PCR_PE | PORT_PCR_PS;
   }
@@ -52,7 +51,6 @@ FlexCAN::FlexCAN(uint32_t baud, uint8_t id)
 #ifdef __MK66FX1M0__
   else if(flexcanBase == FLEXCAN1_BASE) SIM_SCGC3 |=  SIM_SCGC3_FLEXCAN1;
 #endif
-
   FLEXCANb_CTRL1(flexcanBase) &= ~FLEXCAN_CTRL_CLK_SRC;
 
   // enable CAN
