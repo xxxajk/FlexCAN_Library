@@ -30,7 +30,7 @@ private:
   uint32_t flexcanBase;
 
 public:
-  FlexCAN(uint32_t baud = 125000, uint8_t id = 0);
+  FlexCAN(uint32_t baud = 125000, uint8_t id = 0, uint8_t txAlt = 0, uint8_t rxAlt = 0);
   void begin(const CAN_filter_t &mask);
   inline void begin()
   {

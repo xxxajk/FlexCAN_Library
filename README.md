@@ -29,6 +29,16 @@ Please add parts you are using successfully with Teensy 3.1 to this list.
 - Linear LT1796 on 5V (not speedtested)
 
 ###Driver API
+**FlexCAN(baud, id, txAlt, rxAlt)**
+Create the FlexCAN object. The table below describes each parameter together with allowed values. Defaults are marked **bold**. When a non-allowed value is used default will be taken instead.
+
+| Parameter | Description          | Allowed values 
+|-----------|----------------------|------------------------------------------------------------------------
+| baud      | baudrate [bps]       | Teensy 3.1/3.2/3.6: 50000, 100000, **125000**, 250000, 500000, 1000000
+| id        | FlexCAN interface ID | Teensy 3.1/3.2: **0** (CAN0)<br>Teensy 3.6: **0** (CAN0), 1 (CAN1)
+| txAlt     | Alternative TX pin   | Teensy 3.1/3.2: **0** (PIN3), 1 (PIN32)<br>Teensy 3.6 CAN0: **0** (PIN3), 1 (PIN29)<br>Teensy 3.6 CAN1: **0** (PIN33)
+| rxAlt     | Alternative RX pin   | Teensy 3.1/3.2: **0** (PIN4), 1 (PIN25)<br>Teensy 3.6 CAN0: **0** (PIN4), 1 (PIN30)<br>Teensy 3.6 CAN1: **0** (PIN34)
+
 **begin()**
 Enable the CAN to start actively participating on the CANbus.
 

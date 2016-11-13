@@ -22,7 +22,7 @@ static const int rxb = 0;
 #define FLEXCANb_IDFLT_TAB(b, n)          (*(vuint32_t*)(b+0xE0+(n*4)))
 
 // -------------------------------------------------------------
-FlexCAN::FlexCAN(uint32_t baud, uint8_t id)
+FlexCAN::FlexCAN(uint32_t baud, uint8_t id, uint8_t txAlt, uint8_t rxAlt)
 {
   flexcanBase = FLEXCAN0_BASE;
 #ifdef __MK66FX1M0__
@@ -32,14 +32,23 @@ FlexCAN::FlexCAN(uint32_t baud, uint8_t id)
   // set up the pins
   if(flexcanBase == FLEXCAN0_BASE)
   {
-    // 3=PTA12=CAN0_TX, 4=PTA13=CAN0_RX
-    CORE_PIN3_CONFIG = PORT_PCR_MUX(2);
-    CORE_PIN4_CONFIG = PORT_PCR_MUX(2);// | PORT_PCR_PE | PORT_PCR_PS;
+#ifdef __MK66FX1M0__
+    //  3=PTA12=CAN0_TX,  4=PTA13=CAN0_RX (default)
+    // 29=PTB18=CAN0_TX, 30=PTB19=CAN0_RX (alternative)
+    if(txAlt == 1) CORE_PIN29_CONFIG = PORT_PCR_MUX(2); else CORE_PIN3_CONFIG = PORT_PCR_MUX(2); 
+    if(rxAlt == 1) CORE_PIN30_CONFIG = PORT_PCR_MUX(2); else CORE_PIN4_CONFIG = PORT_PCR_MUX(2);// | PORT_PCR_PE | PORT_PCR_PS; 
+#else   
+    //  3=PTA12=CAN0_TX,  4=PTA13=CAN0_RX (default)
+    // 32=PTB18=CAN0_TX, 25=PTB19=CAN0_RX (alternative)
+    if(txAlt == 1) CORE_PIN32_CONFIG = PORT_PCR_MUX(2); else CORE_PIN3_CONFIG = PORT_PCR_MUX(2); 
+    if(rxAlt == 1) CORE_PIN25_CONFIG = PORT_PCR_MUX(2); else CORE_PIN4_CONFIG = PORT_PCR_MUX(2);// | PORT_PCR_PE | PORT_PCR_PS;
+#endif
   }
 #ifdef __MK66FX1M0__
   else if(flexcanBase == FLEXCAN1_BASE)
   {
-    // 33=PTE24=CAN1_TX, 34=PTE25=CAN1_RX
+    // 33=PTE24=CAN1_TX, 34=PTE25=CAN1_RX (default)
+    // NOTE: Alternative CAN1 pins are not broken out on Teensy 3.6
     CORE_PIN33_CONFIG = PORT_PCR_MUX(2);
     CORE_PIN34_CONFIG = PORT_PCR_MUX(2);// | PORT_PCR_PE | PORT_PCR_PS;
   }
