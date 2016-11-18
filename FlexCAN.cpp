@@ -306,13 +306,14 @@ int FlexCAN::write(const CAN_message_t &msg)
 
   if (buffer > -1)
   {
-     Serial.println("Writing a frame directly.");
+     //Serial.println("Writing a frame directly.");
      writeTxRegisters(msg, buffer);
      return 1;
   }
   else //no mailboxes available. Try to buffer it
   {
     uint8_t temp;
+    //Serial.println("Buffered TX");
     temp = (tx_buffer_tail + 1) % SIZE_TX_BUFFER;
     if (temp == tx_buffer_head) return 0;
     tx_frame_buff[tx_buffer_tail].id = msg.id;
@@ -387,9 +388,12 @@ void FlexCAN::message_isr(void)
 {
     uint8_t temp;
     uint32_t status = FLEXCANb_IFLAG1(flexcanBase);
+    CAN_message_t readMesg;
+    bool caughtFrame;
+    CANListener *thisListener;
     FLEXCANb_IFLAG1(flexcanBase) = status; //writing its value back to itself clears all flags
     for (int i = 0; i < 16; i++) if (status & (1 << i)) //has this mailbox triggered an interrupt?
-    {
+    {        
         uint32_t code = FLEXCAN_get_code(FLEXCANb_MBn_CS(flexcanBase, i));
         switch (code)
         {
@@ -411,11 +415,44 @@ void FlexCAN::message_isr(void)
         */    
         case 2: //rx full, that's more like it. Copy the frame to RX buffer
         case 6: //rx overrun. We didn't get there in time and a second frame tried to enter the MB. Whoops... Can probably still grab the frame though.
-            temp = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
-            if (temp != rx_buffer_tail) 
+            readRxRegisters(readMesg, i);            
+            caughtFrame = false;
+            //First, try to send a callback. If no callback registered then buffer the frame.
+            for (int listenerPos = 0; listenerPos < SIZE_LISTENERS; listenerPos++)
             {
-                readRxRegisters((CAN_message_t &)rx_frame_buff[rx_buffer_head], i);
-                rx_buffer_head = temp;
+                thisListener = listener[listenerPos];
+                if (thisListener != NULL)
+                {
+                    if (thisListener->callbacksActive & (1 << i)) 
+                    {
+                        caughtFrame = true;
+                        thisListener->gotFrame(readMesg, i);
+                    }
+                    else if (thisListener->callbacksActive & (1 << 31)) 
+                    {
+                        caughtFrame = true;
+                        thisListener->gotFrame(readMesg, -1);
+                    }
+                }
+            }
+            
+            if (!caughtFrame) //if no objects caught this frame then queue it in the buffer
+            {
+                temp = (rx_buffer_head + 1) % SIZE_RX_BUFFER;
+                if (temp != rx_buffer_tail) 
+                {
+                    memcpy((void *) &rx_frame_buff[rx_buffer_head], &readMesg, sizeof(CAN_message_t));                    
+                    rx_buffer_head = temp;
+                }                
+            }            
+                        
+            //it seems filtering works by matching against the ID stored in the mailbox
+            //so after a frame comes in we've got to refresh the ID field to be the filter ID and not the ID
+            //that just came in.
+            if(MBFilters[i].ext) {
+                FLEXCANb_MBn_ID(flexcanBase, i) = (MBFilters[i].id & FLEXCAN_MB_ID_EXT_MASK);
+            } else {
+                FLEXCANb_MBn_ID(flexcanBase, i) = FLEXCAN_MB_ID_IDSTD(MBFilters[i].id);
             }
             break;
         case 8: //TX inactive. Just chillin' waiting for a message to send. Let's see if we've got one.
