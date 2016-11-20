@@ -391,7 +391,7 @@ void FlexCAN::message_isr(void)
     CAN_message_t readMesg;
     bool caughtFrame;
     CANListener *thisListener;
-    FLEXCANb_IFLAG1(flexcanBase) = status; //writing its value back to itself clears all flags
+    
     for (int i = 0; i < 16; i++) if (status & (1 << i)) //has this mailbox triggered an interrupt?
     {        
         uint32_t code = FLEXCAN_get_code(FLEXCANb_MBn_CS(flexcanBase, i));
@@ -464,6 +464,8 @@ void FlexCAN::message_isr(void)
             break;
         }
     }
+    
+    FLEXCANb_IFLAG1(flexcanBase) = status; //writing its value back to itself clears all flags
 }
 
 boolean FlexCAN::attachObj(CANListener *listener)
@@ -542,6 +544,7 @@ void can0_wakeup_isr(void) {
     Can0.wakeup_isr();
 }
 
+#ifdef __MK66FX1M0__
 void can1_message_isr(void) {
     Can1.message_isr();
 }
@@ -565,7 +568,7 @@ void can1_rx_warn_isr(void) {
 void can1_wakeup_isr(void) {
     Can1.wakeup_isr();
 }
-
+#endif
 
 CANListener::CANListener()
 {
