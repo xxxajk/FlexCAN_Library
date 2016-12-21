@@ -75,6 +75,9 @@ public:
   int available(void);
   int write(const CAN_message_t &msg);
   int read(CAN_message_t &msg);
+  
+  //new functionality added to header but not yet implemented. Fix me
+  void setListenOnly(bool mode); //pass true to go into listen only mode, false to be in normal mode
 
   boolean attachObj(CANListener *listener);
   boolean detachObj(CANListener *listener);

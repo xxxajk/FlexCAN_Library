@@ -22,6 +22,35 @@
 
 CAN_filter_t FlexCAN::defaultMask;
 
+//Some of these are complete guesses. Only really 8 and 16 have been validated.
+//You have been warned. But, there aren't too many options for some of these
+uint8_t bitTimingTable[21][3] = 
+{
+    //prop, seg1, seg2 (4 + prop + seg1 + seg2, seg2 must be at least 1)
+    //No value can go over 7 here.
+    {0,0,1}, //5
+    {1,0,1}, //6
+    {1,1,1}, //7
+    {2,1,1}, //8
+    {2,2,1}, //9
+    {2,3,1}, //10
+    {2,3,2}, //11
+    {2,4,2}, //12
+    {2,5,2}, //13
+    {2,5,3}, //14
+    {2,6,3}, //15
+    {2,7,3}, //16
+    {2,7,4}, //17
+    {3,7,4}, //18
+    {3,7,5}, //19
+    {4,7,5}, //20
+    {4,7,6}, //21
+    {5,7,6}, //22
+    {6,7,6}, //23
+    {6,7,7}, //24
+    {7,7,7}, //25
+};
+
 // -------------------------------------------------------------
 FlexCAN::FlexCAN(uint8_t id)
 {
@@ -44,7 +73,13 @@ FlexCAN::FlexCAN(uint8_t id)
 }
 
 
-// -------------------------------------------------------------
+ /* \brief Bring the hardware into freeze which drops it off the CAN bus
+ *
+ * \param none
+ *
+ * \retval none
+ *
+ */
 void FlexCAN::end(void)
 {
   // enter freeze mode
@@ -54,13 +89,22 @@ void FlexCAN::end(void)
 }
 
 
-// -------------------------------------------------------------
+ /* \brief Initializes the CAN bus to the given settings
+ *
+ * \param baud - Set the baud rate of the bus. Only certain values are valid 50000, 100000, 125000, 250000, 500000, 1000000
+ * \param mask - A default mask to use for all mailbox masks. Optional.
+ * \param txAlt - 1 to enable alternate TX pin (where available)
+ * \param rxAlt - 1 to enable alternate RX pin (where available)
+ *
+ * \retval none
+ *
+ */
 void FlexCAN::begin(uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uint8_t rxAlt)
-{
+{   
   // set up the pins
   if(flexcanBase == FLEXCAN0_BASE)
   {
-    Serial.println("Begin setup of CAN0");
+    //Serial.println("Begin setup of CAN0");
 #ifdef __MK66FX1M0__
     //  3=PTA12=CAN0_TX,  4=PTA13=CAN0_RX (default)
     // 29=PTB18=CAN0_TX, 30=PTB19=CAN0_RX (alternative)
@@ -76,7 +120,7 @@ void FlexCAN::begin(uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uint
 #ifdef __MK66FX1M0__
   else if(flexcanBase == FLEXCAN1_BASE)
   {
-      Serial.println("Begin setup of CAN1");
+      //Serial.println("Begin setup of CAN1");
     // 33=PTE24=CAN1_TX, 34=PTE25=CAN1_RX (default)
     // NOTE: Alternative CAN1 pins are not broken out on Teensy 3.6
     CORE_PIN33_CONFIG = PORT_PCR_MUX(2);
@@ -107,26 +151,81 @@ void FlexCAN::begin(uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uint
   // disable self-reception
   FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_SRX_DIS;
 
-  // segment splits and clock divisor based on baud rate
-    if ( 50000 == baud ) {
-    FLEXCANb_CTRL1(flexcanBase) = (FLEXCAN_CTRL_PROPSEG(2) | FLEXCAN_CTRL_RJW(1)
-                                | FLEXCAN_CTRL_PSEG1(7) | FLEXCAN_CTRL_PSEG2(3) | FLEXCAN_CTRL_PRESDIV(19));
-  } else if ( 100000 == baud ) {
-    FLEXCANb_CTRL1(flexcanBase) = (FLEXCAN_CTRL_PROPSEG(2) | FLEXCAN_CTRL_RJW(1)
-                                | FLEXCAN_CTRL_PSEG1(7) | FLEXCAN_CTRL_PSEG2(3) | FLEXCAN_CTRL_PRESDIV(9));
-  } else if ( 250000 == baud ) {
-    FLEXCANb_CTRL1(flexcanBase) = (FLEXCAN_CTRL_PROPSEG(2) | FLEXCAN_CTRL_RJW(1)
-                                | FLEXCAN_CTRL_PSEG1(7) | FLEXCAN_CTRL_PSEG2(3) | FLEXCAN_CTRL_PRESDIV(3));
-  } else if ( 500000 == baud ) {
-    FLEXCANb_CTRL1(flexcanBase) = (FLEXCAN_CTRL_PROPSEG(2) | FLEXCAN_CTRL_RJW(1)
-                                | FLEXCAN_CTRL_PSEG1(7) | FLEXCAN_CTRL_PSEG2(3) | FLEXCAN_CTRL_PRESDIV(1));
-  } else if ( 1000000 == baud ) {
-    FLEXCANb_CTRL1(flexcanBase) = (FLEXCAN_CTRL_PROPSEG(2) | FLEXCAN_CTRL_RJW(0)
-                                | FLEXCAN_CTRL_PSEG1(1) | FLEXCAN_CTRL_PSEG2(1) | FLEXCAN_CTRL_PRESDIV(1));
-  } else { // 125000
-    FLEXCANb_CTRL1(flexcanBase) = (FLEXCAN_CTRL_PROPSEG(2) | FLEXCAN_CTRL_RJW(1)
-                                | FLEXCAN_CTRL_PSEG1(7) | FLEXCAN_CTRL_PSEG2(3) | FLEXCAN_CTRL_PRESDIV(7));
+  /*
+    now using a system that tries to automatically generate a viable baud setting.
+    Bear these things in mind:
+    - The master clock is 16Mhz
+    - You can freely divide it by anything from 1 to 256
+    - There is always a start bit (+1)
+    - The rest (prop, seg1, seg2) are specified 1 less than their actual value (aka +1)
+    - This gives the low end bit timing as 5 (1 + 1 + 2 + 1) and the high end 25 (1 + 8 + 8 + 8)
+    A worked example: 16Mhz clock, divisor = 19+1, bit values add up to 16 = 16Mhz / 20 / 16 = 50k baud        
+  */
+
+  //have to find a divisor that ends up as close to the target baud as possible while keeping the end result between 5 and 25
+  int divisor = 0; 
+  int result = 16000000 / baud / (divisor + 1);
+  int error = baud - (16000000 / (result * (divisor + 1))); 
+  int bestDivisor = 0;
+  int bestError = error;
+
+  while (result > 5)
+  {
+        divisor++;
+        result = 16000000 / baud / (divisor + 1);
+        if (result <= 25)
+        {
+            error = baud - (16000000 / (result * (divisor + 1)));
+            if (error < 0) error *= -1;
+            //if this error is better than we've ever seen then use it - it's the best option
+            if (error < bestError) 
+            {
+                bestError = error;
+                bestDivisor = divisor;
+            }
+            //If this is equal to a previously good option then
+            //switch to it but only if the bit time result was in the middle of the range
+            //this biases the output to use the middle of the range all things being equal
+            //Otherwise it might try to use a higher divisor and smaller values for prop, seg1, seg2
+            //and that's not necessarily the best idea.
+            if (error == bestError && result > 11 && result < 19)
+            {
+                bestError = error;
+                bestDivisor = divisor;                
+            }
+        }        
   }
+  
+  divisor = bestDivisor;
+  result = 16000000 / baud / (divisor + 1);
+  
+  if (result < 5 || result > 25 || bestError > 300) 
+  {
+      Serial.println("Abort in CAN begin. Couldn't find a suitable baud config!");
+      return;
+  }
+  
+  result -= 5; //the bitTimingTable is offset by 5 since there was no reason to store bit timings for invalid numbers
+  int propSeg = bitTimingTable[result][0];
+  int pSeg1 = bitTimingTable[result][1];
+  int pSeg2 = bitTimingTable[result][2];
+  
+  //obviously do not uncomment these lines in production. Just for testing
+  //when you need to debug what is going on with a non-standard baud rate.
+  /*
+  Serial.println("Bit time values:");
+  Serial.print("Prop = ");
+  Serial.println(propSeg + 1);
+  Serial.print("Seg1 = ");
+  Serial.println(pSeg1 + 1);
+  Serial.print("Seg2 = ");
+  Serial.println(pSeg2 + 1);
+  Serial.print("Divisor = ");
+  Serial.println(divisor + 1);
+  */
+  
+  FLEXCANb_CTRL1(flexcanBase) = (FLEXCAN_CTRL_PROPSEG(propSeg) | FLEXCAN_CTRL_RJW(1)
+                                | FLEXCAN_CTRL_PSEG1(pSeg1) | FLEXCAN_CTRL_PSEG2(pSeg2) | FLEXCAN_CTRL_PRESDIV(divisor));
 
   FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_IRMQ; //enable per-mailbox filtering
   //now have to set default mask and filter for all the RX mailboxes or they won't receive anything by default.
@@ -171,9 +270,31 @@ void FlexCAN::begin(uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uint
 
   FLEXCANb_IMASK1(flexcanBase) = 0xFFFF; //enable interrupt masks for all 16 mailboxes
 
-  Serial.println("CAN initialized properly");
+  //Serial.println("CAN initialized properly");
 }
 
+/* \brief Set listen only mode on or off.
+ *
+ * \param mode - set listen only mode?
+ *
+ * \retval None.
+ *
+ */
+void FlexCAN::setListenOnly(bool mode)
+{
+    if (!(FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK)) { //enter freeze mode if not already there
+       FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_FRZ;
+       FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_HALT;
+       while(!(FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK));
+    }
+    
+    if (mode) FLEXCANb_CTRL1(flexcanBase) |= FLEXCAN_CTRL_LOM;
+    else FLEXCANb_CTRL1(flexcanBase) &= ~FLEXCAN_CTRL_LOM;
+    
+    //exit freeze mode and wait until it is unfrozen.
+    FLEXCANb_MCR(flexcanBase) &= ~FLEXCAN_MCR_HALT;
+    while(FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK);
+}
 
  /* \brief Initializes mailboxes to the requested mix of RX and TX boxes
  *
