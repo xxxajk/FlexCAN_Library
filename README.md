@@ -58,6 +58,7 @@ Receive a frame into "message" if available.  **read()** will return 1 if a fram
 Returns 0 if no frames are available. Otherwise returns the number of available frames in the buffer.
 
 **CAN_message_t** structure:
+
 | Parameter   | Description                    | Allowed values 
 |-------------|--------------------------------|-------------------------------------------------------------------------------------------
 | id          | 11 or 29 bit ID                | Any value up to (2^(N+1) - 1) where N is either 11 or 29. For 11 bit IDs this is 0 to 4095
@@ -76,6 +77,7 @@ Set the receive filter selected by number, 0-15. There are 16 mailboxes in hardw
 The mask and filter are **CAN_filter_t** type structures.
 
 **CAN_filter_t** structure:
+
 | Parameter   | Description                    | Allowed values 
 |-------------|--------------------------------|-------------------------------------------------------------------------------------------
 | id          | 11 or 29 bit ID                | Any value up to (2^(N+1) - 1) where N is either 11 or 29. For 11 bit IDs this is 0 to 4095
