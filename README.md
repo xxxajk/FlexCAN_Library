@@ -13,7 +13,7 @@ Alternatively, pins 25 and 32 can be assigned to CAN0 instead:
 
 Similarily on Teensy 3.5, the same Arduino pins Digital 3 and Digital 4 are assigned to CAN functions TX and RX. Pins 29 and 30 can be alternatively used for CAN0.
 
-![Teensy 3.5 CAN Pins, Digital3=TX, Digital4=RX](/FlexCAN_pins35.png)
+![Teensy 3.5 CAN Pins, Digital3=TX, Digital4=RX](/FlexCAN_pins_35.png)
 
 All boards have an automatically created object named Can0 which can be used to setup the first CAN bus. The Teensy 3.6 adds a Can1 object which can be used to set up the second bus.
 
@@ -133,3 +133,4 @@ message. But, the general handler always sets the mailbox number to -1. You are 
 
 By default each CAN bus can have 4 objects attached for callbacks.
 
+(All images in this README courtesy of Pawelsky)
