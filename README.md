@@ -3,9 +3,17 @@
 ###Introduction
 FlexCAN is a serial communication driver for the CAN peripherial built into the Teensy CPUs. Versions 3.1, 3.2, and 3.5 of the board support single CAN0 controller while version 3.6 supports dual CAN0/CAN1 controllers.  The driver is organized in the Arduino library format.
 
-When the FlexCAN object is configured on Teensy 3.1/3.2/3.5, Arduino pins Digital 3 and Digital 4 are assigned to CAN functions TX and RX.
+When the FlexCAN object is configured on Teensy 3.1/3.2, Arduino pins Digital 3 and Digital 4 are assigned to CAN functions TX and RX.
 
 ![Teensy 3.1/3.2/3.5 CAN Pins, Digital3=TX, Digital4=RX](/FlexCAN_pins.png)
+
+Alternatively, pins 25 and 32 can be assigned to CAN0 instead:
+
+![Teensy 3.1/3.2 Alternative CAN Pins, Digital32=TX, Digital25=RX](/FlexCAN_pins_alt.png)
+
+Similarily on Teensy 3.5, the same Arduino pins Digital 3 and Digital 4 are assigned to CAN functions TX and RX. Pins 29 and 30 can be alternatively used for CAN0.
+
+![Teensy 3.5 CAN Pins, Digital3=TX, Digital4=RX](/FlexCAN_pins35.png)
 
 All boards have an automatically created object named Can0 which can be used to setup the first CAN bus. The Teensy 3.6 adds a Can1 object which can be used to set up the second bus.
 
@@ -29,6 +37,8 @@ Please add parts you are using successfully with Teensy 3.1 to this list.
 - NXP TJA1050T/VM,118 on the same 5V supply as the Teensy. (1MBPS)
 - Microchip MCP2551 on 5V (reported at 500KBPS)
 - Linear LT1796 on 5V (not speedtested)
+- ISO1050DW / DUB
+- Microchip MCP2562 with VIO on 3.3V (tested on Teensy 3.2 and 3.6)
 
 ###Driver API
 All available CAN buses have pre-created objects similarly to how the serial devices are created (Serial, Serial2, etc). In the case of these CAN buses they are called **Can0** (Teensy 3.1/3.2/3.5/3.6) and **Can1** (Teensy 3.6 only).
