@@ -48,10 +48,10 @@ Enable the chosen CAN bus. All parameters are optional. Below is a table of para
 
 | Parameter   | Description          | Allowed values 
 |-------------|----------------------|------------------------------------------------------------------------
-| baud        | baudrate [bps]       | Teensy 3.1/3.2/3.6: 50000, 100000, 125000, **250000**, 500000, 1000000
+| baud        | baudrate [bps]       | Teensy 3.1/3.2/3.5/3.6 - Practically anything from 20k to 1M
 | defaultMask | FlexCAN interface ID | An 11 or 29 bit mask to apply to all mailboxes by default. Defaults to **0** which allows through all traffic
-| txAlt       | Alternative TX pin   | Teensy 3.1/3.2: **0** (PIN3), 1 (PIN32)<br>Teensy 3.6 CAN0: **0** (PIN3), 1 (PIN29)<br>Teensy 3.6 CAN1: **0** (PIN33)
-| rxAlt       | Alternative RX pin   | Teensy 3.1/3.2: **0** (PIN4), 1 (PIN25)<br>Teensy 3.6 CAN0: **0** (PIN4), 1 (PIN30)<br>Teensy 3.6 CAN1: **0** (PIN34)
+| txAlt       | Alternative TX pin   | Teensy 3.1/3.2: 0 (PIN3), 1 (PIN32), Teensy 3.5/3.6 CAN0: 0 (PIN3), 1 (PIN29), Teensy 3.6 CAN1: 0 (PIN33)
+| rxAlt       | Alternative RX pin   | Teensy 3.1/3.2: 0 (PIN4), 1 (PIN25), Teensy 3.5/3.6 CAN0: 0 (PIN4), 1 (PIN30), Teensy 3.6 CAN1: 0 (PIN34)
 
 **end()**
 Disable the CAN from participating on the CANbus.  However, pins remain assigned to the CAN bus hardware.
