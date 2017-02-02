@@ -69,6 +69,7 @@ FlexCAN::FlexCAN(uint8_t id)
   rx_buffer_tail = 0;
   tx_buffer_head = 0;
   tx_buffer_tail = 0;
+  rxBufferFramesLost = 0;
   
   for (int i = 0; i < SIZE_LISTENERS; i++) listener[i] = NULL;
 }
@@ -101,7 +102,7 @@ void FlexCAN::end(void)
  *
  */
 void FlexCAN::begin(uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uint8_t rxAlt)
-{   
+{
   // set up the pins
   if(flexcanBase == FLEXCAN0_BASE)
   {
@@ -229,15 +230,13 @@ void FlexCAN::begin(uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uint
                                 | FLEXCAN_CTRL_PSEG1(pSeg1) | FLEXCAN_CTRL_PSEG2(pSeg2) | FLEXCAN_CTRL_PRESDIV(divisor));
 
   FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_IRMQ; //enable per-mailbox filtering
-  //now have to set default mask and filter for all the RX mailboxes or they won't receive anything by default.
-  CAN_filter_t defaultFilter;
-  defaultFilter.ext = 0;
-  defaultFilter.rtr = 0;
-  defaultFilter.id = 0;
+
+  //now have to set mask and filter for all the RX mailboxes or they won't receive anything by default.
+
   for (int c = 0; c < NUM_MAILBOXES - numTxMailboxes; c++)
   {
      setMask(0, c);
-     setFilter(defaultFilter, c);
+     setFilter(mask, c);
   }
     
   // start the CAN
@@ -306,6 +305,7 @@ void FlexCAN::setListenOnly(bool mode)
  */
 int FlexCAN::setNumTXBoxes(int txboxes) {
     int c;
+    uint32_t oldIde;
 
     if (txboxes > 15) txboxes = 15;
     if (txboxes < 1) txboxes = 1;
@@ -313,7 +313,10 @@ int FlexCAN::setNumTXBoxes(int txboxes) {
 
     //Inialize RX boxen
     for (c = 0; c < NUM_MAILBOXES - numTxMailboxes; c++) {
-        FLEXCANb_MBn_CS(flexcanBase, c) = FLEXCAN_MB_CS_CODE(FLEXCAN_MB_CODE_RX_EMPTY);
+        // preserve the existing filter ide setting
+        oldIde = FLEXCANb_MBn_CS(flexcanBase, c) & FLEXCAN_MB_CS_IDE;
+
+        FLEXCANb_MBn_CS(flexcanBase, c) = FLEXCAN_MB_CS_CODE(FLEXCAN_MB_CODE_RX_EMPTY) | oldIde;
     }
 
     //Initialize TX boxen
@@ -399,6 +402,7 @@ int FlexCAN::read(CAN_message_t &msg)
     msg.ext = rx_frame_buff[rx_buffer_tail].ext;
     msg.len = rx_frame_buff[rx_buffer_tail].len;
     msg.rtr = rx_frame_buff[rx_buffer_tail].rtr;
+
     for (int c = 0; c < 8; c++) msg.buf[c] = rx_frame_buff[rx_buffer_tail].buf[c];
     rx_buffer_tail = (rx_buffer_tail + 1) % SIZE_RX_BUFFER;
 
@@ -489,9 +493,16 @@ void FlexCAN::readRxRegisters(CAN_message_t& msg, uint8_t buffer)
   msg.len = FLEXCAN_get_length(FLEXCANb_MBn_CS(flexcanBase, buffer));
   msg.ext = (FLEXCANb_MBn_CS(flexcanBase, buffer) & FLEXCAN_MB_CS_IDE)? 1:0;
   msg.rtr = (FLEXCANb_MBn_CS(flexcanBase, buffer) & FLEXCAN_MB_CS_RTR)? 1:0;
+  msg.flags.overrun = 0;
+  msg.flags.reserved = 0;
   msg.id  = (FLEXCANb_MBn_ID(flexcanBase, buffer) & FLEXCAN_MB_ID_EXT_MASK);
   if(!msg.ext) {
     msg.id >>= FLEXCAN_MB_ID_STD_BIT_NO;
+  }
+
+  // check for mailbox buffer overruns
+  if (FLEXCAN_get_code(FLEXCANb_MBn_CS(flexcanBase, buffer)) == 6) {
+    msg.flags.overrun = 1;
   }
 
   // copy out message
@@ -579,7 +590,12 @@ void FlexCAN::message_isr(void)
                 {
                     memcpy((void *) &rx_frame_buff[rx_buffer_head], &readMesg, sizeof(CAN_message_t));                    
                     rx_buffer_head = temp;
-                }                
+                } else {
+                    // receiver buffer overrun, track it
+
+                    //Serial.println("Receiver buffer overrun!");
+                    rxBufferFramesLost++;
+                }
             }            
                         
             //it seems filtering works by matching against the ID stored in the mailbox

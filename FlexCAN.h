@@ -15,19 +15,31 @@
 #define IRQ_PRIORITY    64 //0 = highest, 255 = lowest
 
 typedef struct CAN_message_t {
-  uint32_t id; // can identifier
-  uint8_t ext; // identifier is extended
-  uint8_t rtr; //remote transmission request packet type
-  uint8_t len; // length of data
-  uint16_t timeout; // milliseconds, zero will disable waiting
+  uint32_t id;          // can identifier
+  uint16_t timeout;     // milliseconds, zero will disable waiting
+  struct {
+    uint8_t extended:1; // identifier is extended (29-bit)
+    uint8_t remote:1;   // remote transmission request packet type
+    uint8_t overrun:1;  // message overrun
+    uint8_t reserved:5;
+  } flags;
+  uint8_t len;          // length of data
   uint8_t buf[8];
 } CAN_message_t;
 
 typedef struct CAN_filter_t {
-  uint8_t rtr;
-  uint8_t ext;
   uint32_t id;
+  struct {
+    uint8_t extended:1;  // identifier is extended (29-bit)
+    uint8_t remote:1;    // remote transmission request packet type
+    uint8_t reserved:6;
+  } flags;
 } CAN_filter_t;
+
+// for backwards compatibility with previous structure members
+
+#define	ext flags.extended
+#define	rtr flags.remote
 
 class CANListener
 {
@@ -58,6 +70,7 @@ private:
   volatile CAN_message_t tx_frame_buff[SIZE_TX_BUFFER];
   volatile uint16_t rx_buffer_head, rx_buffer_tail;
   volatile uint16_t tx_buffer_head, tx_buffer_tail;
+  uint32_t rxBufferFramesLost;
   void mailbox_int_handler(uint8_t mb, uint32_t ul_status);
   CANListener *listener[SIZE_LISTENERS];
 
@@ -76,6 +89,7 @@ public:
   int available(void);
   int write(const CAN_message_t &msg);
   int read(CAN_message_t &msg);
+  uint32_t rxBufferOverruns(void) { return rxBufferFramesLost; };
   
   //new functionality added to header but not yet implemented. Fix me
   void setListenOnly(bool mode); //pass true to go into listen only mode, false to be in normal mode
