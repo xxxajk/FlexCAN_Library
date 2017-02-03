@@ -399,6 +399,7 @@ int FlexCAN::read(CAN_message_t &msg)
 {
     if (rx_buffer_head == rx_buffer_tail) return 0;
     msg.id = rx_frame_buff[rx_buffer_tail].id;
+    msg.timestamp = rx_frame_buff[rx_buffer_tail].timestamp;
     msg.ext = rx_frame_buff[rx_buffer_tail].ext;
     msg.len = rx_frame_buff[rx_buffer_tail].len;
     msg.rtr = rx_frame_buff[rx_buffer_tail].rtr;
@@ -493,8 +494,10 @@ void FlexCAN::readRxRegisters(CAN_message_t& msg, uint8_t buffer)
   msg.len = FLEXCAN_get_length(FLEXCANb_MBn_CS(flexcanBase, buffer));
   msg.ext = (FLEXCANb_MBn_CS(flexcanBase, buffer) & FLEXCAN_MB_CS_IDE)? 1:0;
   msg.rtr = (FLEXCANb_MBn_CS(flexcanBase, buffer) & FLEXCAN_MB_CS_RTR)? 1:0;
+  msg.timestamp = FLEXCAN_get_timestamp(FLEXCANb_MBn_CS(flexcanBase, buffer));
   msg.flags.overrun = 0;
   msg.flags.reserved = 0;
+
   msg.id  = (FLEXCANb_MBn_ID(flexcanBase, buffer) & FLEXCAN_MB_ID_EXT_MASK);
   if(!msg.ext) {
     msg.id >>= FLEXCAN_MB_ID_STD_BIT_NO;

@@ -16,7 +16,7 @@
 
 typedef struct CAN_message_t {
   uint32_t id;          // can identifier
-  uint16_t timeout;     // milliseconds, zero will disable waiting
+  uint16_t timestamp;   // FlexCAN time when message arrived
   struct {
     uint8_t extended:1; // identifier is extended (29-bit)
     uint8_t remote:1;   // remote transmission request packet type
