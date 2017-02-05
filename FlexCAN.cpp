@@ -20,6 +20,7 @@
 #define FLEXCANb_MBn_WORD1(b, n)          (*(vuint32_t*)(b+0x8C+n*0x10))
 #define FLEXCANb_IDFLT_TAB(b, n)          (*(vuint32_t*)(b+0xE0+(n*4)))
 #define FLEXCANb_MB_MASK(b, n)            (*(vuint32_t*)(b+0x880+(n*4)))
+#define FLEXCANb_ESR1(b)                  (*(vuint32_t*)(b+0x20)) 
 
 CAN_filter_t FlexCAN::defaultMask;
 
@@ -225,7 +226,7 @@ void FlexCAN::begin(uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uint
   Serial.println(divisor + 1);
   */
   
-  FLEXCANb_CTRL1(flexcanBase) = (FLEXCAN_CTRL_PROPSEG(propSeg) | FLEXCAN_CTRL_RJW(1)
+  FLEXCANb_CTRL1(flexcanBase) = (FLEXCAN_CTRL_PROPSEG(propSeg) | FLEXCAN_CTRL_RJW(1) | FLEXCAN_CTRL_ERR_MSK
                                 | FLEXCAN_CTRL_PSEG1(pSeg1) | FLEXCAN_CTRL_PSEG2(pSeg2) | FLEXCAN_CTRL_PRESDIV(divisor));
 
   FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_IRMQ; //enable per-mailbox filtering
@@ -638,7 +639,19 @@ void FlexCAN::bus_off_isr(void)
 
 void FlexCAN::error_isr(void)
 {
+    uint32_t status = FLEXCANb_ESR1(flexcanBase);
     
+    CAN_message_t msg;
+    
+    if (status & FLEXCAN_ESR_ACK_ERR) //an acknowledge error happened - frame was not ACK'd
+    {      
+        msg.ext = (FLEXCANb_MBn_CS(flexcanBase, buffer) & FLEXCAN_MB_CS_IDE)? 1:0;  
+        msg.id  = (FLEXCANb_MBn_ID(flexcanBase, buffer) & FLEXCAN_MB_ID_EXT_MASK);
+        if(!msg.ext) {
+            msg.id >>= FLEXCAN_MB_ID_STD_BIT_NO;
+        }
+        
+    }
 }
 
 void FlexCAN::tx_warn_isr(void)
