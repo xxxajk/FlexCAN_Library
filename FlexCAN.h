@@ -8,43 +8,72 @@
 
 #include <Arduino.h>
 
-#define SIZE_RX_BUFFER  32 //RX incoming ring buffer size
+#define SIZE_RX_BUFFER  48 //RX incoming ring buffer size
 #define SIZE_TX_BUFFER  16 //TX ring buffer size
 #define SIZE_LISTENERS  4  //number of classes that can register as listeners on each CAN bus
 #define NUM_MAILBOXES   16 //architecture specific but all Teensy 3.x boards have 16 mailboxes
 #define IRQ_PRIORITY    64 //0 = highest, 255 = lowest
 
+#define COLLECT_CAN_STATS
+
 typedef struct CAN_message_t {
-  uint32_t id; // can identifier
-  uint8_t ext; // identifier is extended
-  uint8_t rtr; //remote transmission request packet type
-  uint8_t len; // length of data
-  uint16_t timeout; // milliseconds, zero will disable waiting
+  uint32_t id;          // can identifier
+  uint16_t timestamp;   // FlexCAN time when message arrived
+  struct {
+    uint8_t extended:1; // identifier is extended (29-bit)
+    uint8_t remote:1;   // remote transmission request packet type
+    uint8_t overrun:1;  // message overrun
+    uint8_t reserved:5;
+  } flags;
+  uint8_t len;          // length of data
   uint8_t buf[8];
 } CAN_message_t;
 
 typedef struct CAN_filter_t {
-  uint8_t rtr;
-  uint8_t ext;
   uint32_t id;
+  struct {
+    uint8_t extended:1;  // identifier is extended (29-bit)
+    uint8_t remote:1;    // remote transmission request packet type
+    uint8_t reserved:6;
+  } flags;
 } CAN_filter_t;
+
+// statistics about the CAN interface
+
+typedef struct CAN_stats_t {
+  bool     enabled;           // enable collecting statistics
+  uint32_t ringRxMax;         // number of entries in the ring buffer
+  uint32_t ringRxHighWater;   // maximum entries used in the ring buffer
+  uint32_t ringRxFramesLost;  // total number of frames lost
+  uint32_t ringTxMax;         // number of entries in the ring buffer
+  uint32_t ringTxHighWater;   // maximum entries used in the ring buffer
+  struct {
+    uint32_t refCount;        // mailbox reference (use) count
+    uint32_t overrunCount;    // mailbox message overrun count
+  } mb[NUM_MAILBOXES];
+} CAN_stats_t;
+
+// for backwards compatibility with previous structure members
+
+#define	ext flags.extended
+#define	rtr flags.remote
 
 class CANListener
 {
 public:
   CANListener();
-    
+
   virtual void gotFrame(CAN_message_t &frame, int mailbox);
 
   void attachMBHandler(uint8_t mailBox);
   void detachMBHandler(uint8_t mailBox);
   void attachGeneralHandler();
   void detachGeneralHandler();
-    
+
 private:
   int callbacksActive; //bitfield letting the code know which callbacks to actually try to use (for object oriented callbacks only)
-    
-  friend class FlexCAN; //class has to have access to the the guts of this one 
+
+  friend class FlexCAN; //class has to have access to the the guts of this one
 };
 
 // -------------------------------------------------------------
@@ -63,6 +92,11 @@ private:
 
   void writeTxRegisters(const CAN_message_t &msg, uint8_t buffer);
   void readRxRegisters(CAN_message_t &msg, uint8_t buffer);
+
+#ifdef COLLECT_CAN_STATS
+  CAN_stats_t stats;
+#endif
+
 protected:
   uint8_t numTxMailboxes;
 
@@ -76,20 +110,28 @@ public:
   int available(void);
   int write(const CAN_message_t &msg);
   int read(CAN_message_t &msg);
-  
+  uint32_t rxBufferOverruns(void) { return stats.ringRxFramesLost; };
+
+#ifdef COLLECT_CAN_STATS
+  void startStats(void) { stats.enabled = true; };
+  void stopStats(void) { stats.enabled = false; };
+  void clearStats(void);
+  CAN_stats_t getStats(void) { return stats; };
+#endif
+
   //new functionality added to header but not yet implemented. Fix me
   void setListenOnly(bool mode); //pass true to go into listen only mode, false to be in normal mode
 
   boolean attachObj(CANListener *listener);
   boolean detachObj(CANListener *listener);
-  
+
   //int watchFor(); //allow anything through
   //int watchFor(uint32_t id); //allow just this ID through (automatic determination of extended status)
   //int watchFor(uint32_t id, uint32_t mask); //allow a range of ids through
   //int watchForRange(uint32_t id1, uint32_t id2); //try to allow the range from id1 to id2 - automatically determine base ID and mask
 
   int setNumTXBoxes(int txboxes);
-  
+
   void message_isr(void);
   void bus_off_isr(void);
   void error_isr(void);
