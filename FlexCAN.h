@@ -105,6 +105,7 @@ public:
   void begin(uint32_t baud = 250000, const CAN_filter_t &mask = defaultMask, uint8_t txAlt = 0, uint8_t rxAlt = 0);
 
   void setFilter(const CAN_filter_t &filter, uint8_t n);
+  bool getFilter(CAN_filter_t &filter, uint8_t n);
   void setMask(uint32_t mask, uint8_t n);
   void end(void);
   int available(void);

@@ -337,18 +337,39 @@ int FlexCAN::setNumTXBoxes(int txboxes) {
  */
 void FlexCAN::setFilter(const CAN_filter_t &filter, uint8_t n)
 {
-   if (n < NUM_MAILBOXES - numTxMailboxes)
-   {
-       MBFilters[n] = filter;
-       if (filter.ext)
-       {
-          FLEXCANb_MBn_ID(flexcanBase, n) = (filter.id & FLEXCAN_MB_ID_EXT_MASK);
-          FLEXCANb_MBn_CS(flexcanBase, n) |= FLEXCAN_MB_CS_IDE;
-       } else {
-          FLEXCANb_MBn_ID(flexcanBase, n) = FLEXCAN_MB_ID_IDSTD(filter.id);
-          FLEXCANb_MBn_CS(flexcanBase, n) &= ~FLEXCAN_MB_CS_IDE;
-       }
-   }
+    if (n < NUM_MAILBOXES - numTxMailboxes)
+    {
+        MBFilters[n] = filter;
+        if (filter.ext)
+        {
+           FLEXCANb_MBn_ID(flexcanBase, n) = (filter.id & FLEXCAN_MB_ID_EXT_MASK);
+           FLEXCANb_MBn_CS(flexcanBase, n) |= FLEXCAN_MB_CS_IDE;
+        } else {
+           FLEXCANb_MBn_ID(flexcanBase, n) = FLEXCAN_MB_ID_IDSTD(filter.id);
+           FLEXCANb_MBn_CS(flexcanBase, n) &= ~FLEXCAN_MB_CS_IDE;
+        }
+    }
+}
+
+ /* \brief Gets a per-mailbox filter.
+ *
+ * \param returned filter structure,  mailbox selected
+ *
+ * \retval true if mailbox s valid, false otherwise
+ *
+ */
+bool FlexCAN::getFilter(CAN_filter_t &filter, uint8_t n)
+{
+    if (n < NUM_MAILBOXES - numTxMailboxes)
+    {
+        filter.id = MBFilters[n].id;
+        filter.flags.extended = MBFilters[n].flags.extended;
+        filter.flags.remote = MBFilters[n].flags.remote;
+        filter.flags.reserved = MBFilters[n].flags.reserved;
+        return (true);
+    }
+
+    return (false);
 }
 
 /*
