@@ -28,7 +28,7 @@ Even though the Teensy 3.1/3.2 is operating on 3.3V, use of 5V transceivers may 
 
 Note that CAN will normally require termination resistors.  These are located at the two ends of a CAN bus to prevent reflections.  Do not add more terminators when connecting devices to an existing properly terminated CAN bus. A properly terminated CAN bus has a resistance of 60 ohms between CAN-High and CAN-Low. This is done by placing 120 ohms of resistance on both ends of the bus.
 
-Supported baud rates are 50000, 100000, 125000, 250000, 500000, and 1000000 bits per second.  If the baud rate is not specified it will default to 250000.
+Supported baud rates are 50000, 100000, 125000, 250000, 500000, and 1000000 bits per second.  If the baud rate is not specified it will default to 250000. Other baud rates are possible but care should be taken to ensure that the desired baud rate is possible. The CAN clock is 16MHz so it must be possible to take 16MHz and divide it evenly. For example 16Mhz / 250k = 64 so that works. 16MHz / 47 = 340425 so that CAN rate would even work. But, rates not very close to evenly divisible into 16MHz will cause trouble.
 
 ###CAN Transceiver Options
 Please add parts you are using successfully with Teensy 3.1 to this list.
@@ -69,13 +69,15 @@ Returns 0 if no frames are available. Otherwise returns the number of available 
 
 **CAN_message_t** structure:
 
-| Parameter   | Description                    | Allowed values 
-|-------------|--------------------------------|-------------------------------------------------------------------------------------------
-| id          | 11 or 29 bit ID                | Any value up to (2^(N+1) - 1) where N is either 11 or 29. For 11 bit IDs this is 0 to 4095
-| ext         | Specify whether 11 or 29 bit ID| 0 for standard/11 bit IDs, 1 for extended/29 bit IDs
-| len         | # of data bytes in this frame  | 0 to 8
-| timeout     | No longer used                 | Was used in older version of library. Not needed in interrupt driven context.
-| buf         | Data bytes for this frame      | Anything. These 0 to 8 bytes are the payload of the frame.
+| Parameter       | Description                    | Allowed values 
+|-----------------|--------------------------------|-------------------------------------------------------------------------------------------
+| id              | 11 or 29 bit ID                | Any value up to (2^(N+1) - 1) where N is either 11 or 29. For 11 bit IDs this is 0 to 4095
+| flags.extended  | Specify whether 11 or 29 bit ID| 0 for standard/11 bit IDs, 1 for extended/29 bit IDs
+| flags.remote    | Specify whether RTR frame      | 0 = Normal frame 1 = Remote request frame
+| flags.overrun   | Was there an overrun?          | 0 = No overruns detected 1 = Message buffer overrun
+| len             | # of data bytes in this frame  | 0 to 8
+| timestamp       | Hardware based timestamp       | Hardware generated timestamp when frame was received (on RX frames)
+| buf             | Data bytes for this frame      | Anything. These 0 to 8 bytes are the payload of the frame.
 
 **setNumTXBoxes(boxes)**
 Set the number of mailboxes used for transmit. There are 16 mailboxes in hardware. 0 to 16 of them can be set as transmission mailboxes. These mailboxes will then not be used for reception. By default, two mailboxes are automatically configured for transmission.
@@ -88,17 +90,46 @@ The mask and filter are **CAN_filter_t** type structures.
 
 **CAN_filter_t** structure:
 
-| Parameter   | Description                    | Allowed values 
-|-------------|--------------------------------|-------------------------------------------------------------------------------------------
-| id          | 11 or 29 bit ID                | Any value up to (2^(N+1) - 1) where N is either 11 or 29. For 11 bit IDs this is 0 to 4095
-| ext         | Specify whether 11 or 29 bit ID| 0 for standard/11 bit IDs, 1 for extended/29 bit IDs
-| rtr         | Filter for RTR frames?         | 0 for non RTR, 1 for RTR frame. Part of a long since deprecated part of the CAN standard.
+| Parameter       | Description                    | Allowed values 
+|-----------------|--------------------------------|-------------------------------------------------------------------------------------------
+| id              | 11 or 29 bit ID                | Any value up to (2^(N+1) - 1) where N is either 11 or 29. For 11 bit IDs this is 0 to 4095
+| flags.extended  | Specify whether 11 or 29 bit ID| 0 for standard/11 bit IDs, 1 for extended/29 bit IDs
+| flags.remote    | Filter for RTR frames?         | 0 for non RTR, 1 for RTR frame. Part of a long since deprecated part of the CAN standard.
 
 **setMask(mask, number)**
 Set the receive mask for the selected mailbox. Cannot be used on transmission mailboxes (The last two by default). Used along with filters to configure which messages will be accepted by each mailbox. The filtering scheme works like this: When a frame comes in the ID of the frame has a boolean AND applied with the mask for the mailbox. Then, this masked value is compared to the filter ID. If the two match then the frame is accepted. If not the next mailbox is checked. If no mailboxes accept a frame it is thrown away. Here is an example: Mask of 0x7F0, filter ID of 0x320. If a frame with id 0x322 comes in then 0x322 AND 0x7F0 = 0x320. This matches so the frame is accepted. If a frame comes in with id 0x33B then 0x33B AND 0x7F0 = 0x330 which does not match. Unless another mailbox accepts the frame it will be thrown away.
 
 ###In-order Transmission
 By default two transmission mailboxes are configured. Ordinarily two mailboxes still allow for in-order transmission as they'll ping-pong while loading frames and send them out in order on the bus. However, there are still some scenarios where it might be possible for both mailboxes to get loaded and the wrong frame to go out causing a single frame out of order situation. For strict in-order transmission the library should be set to use a single transmission box like so: **Can0.setNumTXBoxes(1);**
+
+###CAN Bus Statistics
+
+**CAN_stats_t** structure:
+
+| Parameter          | Description                          | Allowed values 
+|--------------------|--------------------------------------|-------------------------------------------------------------------------------------------
+| enabled            | Enable collecting stats              | True/False
+| ringRxMax          | Number of entries in the ring buffer | Set at compile time. Here for reference
+| ringRxHighWater    | Max entries used in ring buffer      | Highest number gotten to since reset
+| ringRxFramesLost   | Total number of frames lost          | Lost frames count
+| ringTxMax          | Number of entries in the ring buffer | Set at compile time. Here for reference
+| ringTxHighWater    | Max entries used in ring buffer      | Highest number gotten to since reset
+| mb[#].refCount     | Mailbox use count                    | 0 to 4 billion
+| mb[#].overrunCount | Mailbox overrun count                | 0 to 4 billion
+ 
+ 
+**startStats()**
+Start capturing statistics (those from the table above)
+
+**stopStats()**
+Quit updating CAN statistics
+
+**clearStats()**
+Reset all statistics back to zero / default state
+  
+**getStats()**
+Returns a CAN_stats_t structure with the current statistic values. 
+
 
 ###Object Oriented Callback Interface
 This library has the capability to allow C++ objects to register themselves with the library such that they will automatically be sent any incoming frames that were accepted by a mailbox. This allows user code to no longer have to do any polling to receive messages. In order to take advantage of this, base your class off of the **CANListener** class. Then, tell either Can0 or Can1 about your class with:
