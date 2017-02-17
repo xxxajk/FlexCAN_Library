@@ -79,7 +79,7 @@ Returns 0 if no frames are available. Otherwise returns the number of available 
 | timestamp       | Hardware based timestamp       | Hardware generated timestamp when frame was received (on RX frames)
 | buf             | Data bytes for this frame      | Anything. These 0 to 8 bytes are the payload of the frame.
 
-**setNumTXBoxes(boxes)**
+**setNumTxBoxes(boxes)**
 Set the number of mailboxes used for transmit. There are 16 mailboxes in hardware. 0 to 16 of them can be set as transmission mailboxes. These mailboxes will then not be used for reception. By default, two mailboxes are automatically configured for transmission.
  
 ###Use of Optional RX Filtering
@@ -100,7 +100,12 @@ The mask and filter are **CAN_filter_t** type structures.
 Set the receive mask for the selected mailbox. Cannot be used on transmission mailboxes (The last two by default). Used along with filters to configure which messages will be accepted by each mailbox. The filtering scheme works like this: When a frame comes in the ID of the frame has a boolean AND applied with the mask for the mailbox. Then, this masked value is compared to the filter ID. If the two match then the frame is accepted. If not the next mailbox is checked. If no mailboxes accept a frame it is thrown away. Here is an example: Mask of 0x7F0, filter ID of 0x320. If a frame with id 0x322 comes in then 0x322 AND 0x7F0 = 0x320. This matches so the frame is accepted. If a frame comes in with id 0x33B then 0x33B AND 0x7F0 = 0x330 which does not match. Unless another mailbox accepts the frame it will be thrown away.
 
 ###In-order Transmission
-By default two transmission mailboxes are configured. Ordinarily two mailboxes still allow for in-order transmission as they'll ping-pong while loading frames and send them out in order on the bus. However, there are still some scenarios where it might be possible for both mailboxes to get loaded and the wrong frame to go out causing a single frame out of order situation. For strict in-order transmission the library should be set to use a single transmission box like so: **Can0.setNumTXBoxes(1);**
+By default two transmission mailboxes are configured. Ordinarily two mailboxes still allow for in-order transmission as they'll ping-pong while loading frames and send them out in order on the bus. However, there are still some scenarios where it might be possible for both mailboxes to get loaded and the wrong frame to go out causing a single frame out of order situation. For strict in-order transmission the library should be set to use a single transmission box like so: **Can0.setNumTxBoxes(1);**
+
+###Out of Order Reception
+The driver configuration uses multiple mailboxes to receive the incoming messages.  The FlexCAN hardware sequentially searches the configured mailboxes for an empty mailbox, an incoming message is stored in the first empty mailbox found.  As messages are copied from the FlexCAN mailboxes to the incoming ring buffer, the driver sequentially clears the mailboxes. This creates the possibility that the FlexCAN hardware may fill the mailboxes out of order; a recently cleared mailbox may be filled along with a mailbox following the already filled mailboxes.
+
+This may result in messages being delivered out of order by the **read()** function.  The timestamp within the message will correctly indicate the time of arrival and should be used to order the messages.
 
 ###CAN Bus Statistics
 
