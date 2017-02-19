@@ -84,7 +84,10 @@ Set the number of mailboxes used for transmit. There are 16 mailboxes in hardwar
  
 ###Use of Optional RX Filtering
 **setFilter(filter, number)**
-Set the receive filter selected by number, 0-15. There are 16 mailboxes in hardware but 2 are used, by default, for TX. Those cannot have filters set. Otherwise, each mailbox has its own filter and mask. The transmit boxes are always at the end. So, by default they are 14 and 15. Filters take the form of a CAN bus ID (11 bit or 29 bit).
+Set the receive filter selected by "number", 0-15. There are 16 mailboxes in hardware but 2 are used, by default, for TX. Those cannot have filters set. Otherwise, each mailbox has its own filter and mask. The transmit boxes are always at the end. So, by default they are 14 and 15. Filters take the form of a CAN bus ID (11 bit or 29 bit).
+
+**getFilter(filter, number)**
+Retrieve the mailbox filter selected by "number", 0-15.  If the mailbox has a filter, true is returned, otherwise false is returned.  The filter is returned in the parameter "filter".
 
 The mask and filter are **CAN_filter_t** type structures.
 
