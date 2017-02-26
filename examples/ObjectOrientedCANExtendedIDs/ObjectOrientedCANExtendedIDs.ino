@@ -26,7 +26,7 @@ class CANClass : public CANListener
 {
 public:
    void printFrame(CAN_message_t &frame, int mailbox);
-   void gotFrame(CAN_message_t &frame, int mailbox); //overrides the parent version so we can actually do something
+   bool frameHandler(CAN_message_t &frame, int mailbox, uint8_t controller); //overrides the parent version so we can actually do something
 };
 
 void CANClass::printFrame(CAN_message_t &frame, int mailbox)
@@ -47,9 +47,11 @@ void CANClass::printFrame(CAN_message_t &frame, int mailbox)
  
 }
 
-void CANClass::gotFrame(CAN_message_t &frame, int mailbox)
+bool CANClass::frameHandler(CAN_message_t &frame, int mailbox, uint8_t controller)
 {
     printFrame(frame, mailbox);
+
+    return true;
 }
 
 CANClass CANClass0;

@@ -118,10 +118,10 @@ This may result in messages being delivered out of order by the **read()** funct
 |--------------------|--------------------------------------|-------------------------------------------------------------------------------------------
 | enabled            | Enable collecting stats              | True/False
 | ringRxMax          | Number of entries in the ring buffer | Set at compile time. Here for reference
-| ringRxHighWater    | Max entries used in ring buffer      | Highest number gotten to since reset
+| ringRxHighWater    | Max entries used in ring buffer      | 0 to ringRxMax
 | ringRxFramesLost   | Total number of frames lost          | Lost frames count
 | ringTxMax          | Number of entries in the ring buffer | Set at compile time. Here for reference
-| ringTxHighWater    | Max entries used in ring buffer      | Highest number gotten to since reset
+| ringTxHighWater    | Max entries used in ring buffer      | 0 to ringTxMax
 | mb[#].refCount     | Mailbox use count                    | 0 to 4 billion
 | mb[#].overrunCount | Mailbox overrun count                | 0 to 4 billion
  
@@ -166,9 +166,15 @@ It should be noted, however, that attachMBHandler calls override the general han
 
 Once you've attached your object to the library and set up which mailboxes the object is interested in you will begin receiving callbacks as messages come in. Callbacks are done via a virtual function you must override in your class:
 
-**gotFrame(frame, mailbox)**
-A function you create in your class that gets called any time a new message comes in. The message is passed in the first parameter. The second parameter shows which mailbox sent this
-message. But, the general handler always sets the mailbox number to -1. You are allowed to have both per-mailbox handlers and the general handler set up at the same time. If a message comes in to a mailbox you are specifically monitoring then it's mailbox number will be passed to this function. If the general handler is also set up then any other mailboxes with incoming messages will show up as -1 here. Also note, any message captured by the callback system will **not** be retrievable with read() any longer. Messages captured by the callback system are not buffered.
+**frameHandler(frame, mailbox, controller)**
+A function you create in your class that gets called anytime a new message comes in. The message is passed in the first parameter. The second parameter shows which mailbox sent this
+message. But, the general handler always sets the mailbox number to -1. The third parameter indicates which CAN controller the frame arrived from.
+
+You are allowed to have both per-mailbox handlers and the general handler configured at the same time. If a message arrives at a mailbox being monitoring then it's mailbox number will be passed to this function.  If a general handler is configured, messages arriving at mailboxes that do not have a per-mailbox handler will result in the general handler being called.  When the general handler is called the mailbox is identified as -1.
+
+The frame handler returns *true* if the frame was processed, otherwise *false* is returned.  If none of the installed handlers process the frame, the frame will be added to the ring buffer for processing with the *read()* function.  Processed frames are not added to the ring buffer.
+
+Note, the handlers are called in the context of the interrupt.  Care should be taken to avoid long processing times in the handler, mailbox overruns by the FlexCAN controller may occur if the handlers introduce long latencies.
 
 By default each CAN bus can have 4 objects attached for callbacks.
 

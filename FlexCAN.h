@@ -9,16 +9,16 @@
 #include <Arduino.h>
 
 #if !defined(SIZE_RX_BUFFER)
-#define SIZE_RX_BUFFER  32 //RX incoming ring buffer size
+#define SIZE_RX_BUFFER  32 // receive incoming ring buffer size
 #endif
 
 #if !defined(SIZE_TX_BUFFER)
-#define SIZE_TX_BUFFER  16 //TX ring buffer size
+#define SIZE_TX_BUFFER  16 // transmit ring buffer size
 #endif
 
-#define SIZE_LISTENERS  4  //number of classes that can register as listeners on each CAN bus
-#define NUM_MAILBOXES   16 //architecture specific but all Teensy 3.x boards have 16 mailboxes
-#define IRQ_PRIORITY    64 //0 = highest, 255 = lowest
+#define SIZE_LISTENERS  4  // number of classes that can register as listeners on each CAN bus
+#define NUM_MAILBOXES   16 // architecture specific but all Teensy 3.x boards have 16 mailboxes
+#define IRQ_PRIORITY    64 // 0 = highest, 255 = lowest
 
 #define COLLECT_CAN_STATS
 
@@ -76,29 +76,30 @@ typedef struct ringbuffer_t {
 class CANListener
 {
 public:
-  CANListener();
+  CANListener ();
 
-  virtual void gotFrame(CAN_message_t &frame, int mailbox);
+  virtual bool frameHandler (CAN_message_t &frame, int mailbox, uint8_t controller);
 
-  void attachMBHandler(uint8_t mailBox);
-  void detachMBHandler(uint8_t mailBox);
-  void attachGeneralHandler();
-  void detachGeneralHandler();
+  void attachMBHandler (uint8_t mailBox);
+  void detachMBHandler (uint8_t mailBox);
+  void attachGeneralHandler (void);
+  void detachGeneralHandler (void);
 
 private:
-  int callbacksActive; //bitfield letting the code know which callbacks to actually try to use (for object oriented callbacks only)
+  uint32_t callbacksActive; // bitfield indicating which callbacks are installed (for object oriented callbacks only)
 
-  friend class FlexCAN; //class has to have access to the the guts of this one
+  friend class FlexCAN;     // class has to have access to the the guts of this one
 };
 
 // -------------------------------------------------------------
+
 class FlexCAN
 {
 private:
   uint32_t flexcanBase;
   struct CAN_filter_t MBFilters[NUM_MAILBOXES];
   static struct CAN_filter_t defaultMask;
-  void mailbox_int_handler(uint8_t mb, uint32_t ul_status);
+  void mailbox_int_handler (uint8_t mb, uint32_t ul_status);
   CANListener *listener[SIZE_LISTENERS];
 
   ringbuffer_t txRing;
@@ -123,44 +124,44 @@ protected:
   uint8_t numTxMailboxes;
 
 public:
-  FlexCAN(uint8_t id = 0);
-  void begin(uint32_t baud = 250000, const CAN_filter_t &mask = defaultMask, uint8_t txAlt = 0, uint8_t rxAlt = 0);
+  FlexCAN (uint8_t id = 0);
+  void begin (uint32_t baud = 250000, const CAN_filter_t &mask = defaultMask, uint8_t txAlt = 0, uint8_t rxAlt = 0);
 
-  void setFilter(const CAN_filter_t &filter, uint8_t n);
-  bool getFilter(CAN_filter_t &filter, uint8_t n);
-  void setMask(uint32_t mask, uint8_t n);
-  void end(void);
-  int available(void);
-  int write(const CAN_message_t &msg);
-  int read(CAN_message_t &msg);
-  uint32_t rxBufferOverruns(void) { return stats.ringRxFramesLost; };
+  void setFilter (const CAN_filter_t &filter, uint8_t n);
+  bool getFilter (CAN_filter_t &filter, uint8_t n);
+  void setMask (uint32_t mask, uint8_t n);
+  void end (void);
+  uint32_t available (void);
+  int write (const CAN_message_t &msg);
+  int read (CAN_message_t &msg);
+  uint32_t rxBufferOverruns (void) { return stats.ringRxFramesLost; };
 
 #ifdef COLLECT_CAN_STATS
-  void startStats(void) { stats.enabled = true; };
-  void stopStats(void) { stats.enabled = false; };
-  void clearStats(void);
-  CAN_stats_t getStats(void) { return stats; };
+  void startStats (void) { stats.enabled = true; };
+  void stopStats (void) { stats.enabled = false; };
+  void clearStats (void);
+  CAN_stats_t getStats (void) { return stats; };
 #endif
 
   //new functionality added to header but not yet implemented. Fix me
-  void setListenOnly(bool mode); //pass true to go into listen only mode, false to be in normal mode
+  void setListenOnly (bool mode); //pass true to go into listen only mode, false to be in normal mode
 
-  bool attachObj(CANListener *listener);
-  bool detachObj(CANListener *listener);
+  bool attachObj (CANListener *listener);
+  bool detachObj (CANListener *listener);
 
   //int watchFor(); //allow anything through
   //int watchFor(uint32_t id); //allow just this ID through (automatic determination of extended status)
   //int watchFor(uint32_t id, uint32_t mask); //allow a range of ids through
   //int watchForRange(uint32_t id1, uint32_t id2); //try to allow the range from id1 to id2 - automatically determine base ID and mask
 
-  int setNumTxBoxes(int txboxes);
+  uint32_t setNumTxBoxes (uint32_t txboxes);
 
-  void message_isr(void);
-  void bus_off_isr(void);
-  void error_isr(void);
-  void tx_warn_isr(void);
-  void rx_warn_isr(void);
-  void wakeup_isr(void);
+  void message_isr (void);
+  void bus_off_isr (void);
+  void error_isr (void);
+  void tx_warn_isr (void);
+  void rx_warn_isr (void);
+  void wakeup_isr (void);
 };
 
 extern FlexCAN Can0;
