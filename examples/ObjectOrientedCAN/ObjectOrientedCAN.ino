@@ -20,7 +20,7 @@ class ExampleClass : public CANListener
 {
 public:
    void printFrame(CAN_message_t &frame, int mailbox);
-   void gotFrame(CAN_message_t &frame, int mailbox); //overrides the parent version so we can actually do something
+   bool frameHandler(CAN_message_t &frame, int mailbox, uint8_t controller); //overrides the parent version so we can actually do something
 };
 
 void ExampleClass::printFrame(CAN_message_t &frame, int mailbox)
@@ -37,9 +37,11 @@ void ExampleClass::printFrame(CAN_message_t &frame, int mailbox)
    Serial.write('\n');
 }
 
-void ExampleClass::gotFrame(CAN_message_t &frame, int mailbox)
+bool ExampleClass::frameHandler(CAN_message_t &frame, int mailbox, uint8_t controller)
 {
     printFrame(frame, mailbox);
+
+    return true;
 }
 
 ExampleClass exampleClass;
