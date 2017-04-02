@@ -21,7 +21,7 @@
 #define FLEXCANb_MBn_WORD1(b, n)          (*(vuint32_t*)(b+0x8C+n*0x10))
 #define FLEXCANb_IDFLT_TAB(b, n)          (*(vuint32_t*)(b+0xE0+(n*4)))
 #define FLEXCANb_MB_MASK(b, n)            (*(vuint32_t*)(b+0x880+(n*4)))
-#define FLEXCANb_ESR1(b)                  (*(vuint32_t*)(b+0x20)) 
+#define FLEXCANb_ESR1(b)                  (*(vuint32_t*)(b+0x20))
 
 #if defined(__MK66FX1M0__)
 # define INCLUDE_FLEXCAN_CAN1
@@ -51,8 +51,7 @@ CAN_filter_t FlexCAN::defaultMask;
 // Some of these are complete guesses. Only really 8 and 16 have been validated.
 // You have been warned. But, there aren't too many options for some of these
 
-uint8_t bitTimingTable[21][3] =
-{
+uint8_t bitTimingTable[21][3] = {
     // prop, seg1, seg2 (4 + prop + seg1 + seg2, seg2 must be at least 1)
     // No value can go over 7 here.
     {0,0,1}, //5
@@ -78,80 +77,80 @@ uint8_t bitTimingTable[21][3] =
     {7,7,7}, //25
 };
 
- /*
-  * \brief Initialize the FlexCAN driver class
-  *
-  * \param id - CAN bus interface selection
-  *
-  * \retval none
-  *
-  */
+/*
+ * \brief Initialize the FlexCAN driver class
+ *
+ * \param id - CAN bus interface selection
+ *
+ * \retval none
+ *
+ */
 
 FlexCAN::FlexCAN (uint8_t id)
 {
-  uint32_t i;
+    uint32_t i;
 
-  flexcanBase = FLEXCAN0_BASE;
+    flexcanBase = FLEXCAN0_BASE;
 
 #if defined (INCLUDE_FLEXCAN_CAN1)
-  if (id > 0)  {
-    flexcanBase = FLEXCAN1_BASE;
-  }
+    if (id > 0)  {
+        flexcanBase = FLEXCAN1_BASE;
+    }
 #endif
 
-  // Default mask is allow everything
+    // Default mask is allow everything
 
-  defaultMask.flags.remote = 0;
-  defaultMask.flags.extended = 0;
-  defaultMask.id = 0;
+    defaultMask.flags.remote = 0;
+    defaultMask.flags.extended = 0;
+    defaultMask.id = 0;
 
-  // set up the transmit and receive ring buffers
+    // set up the transmit and receive ring buffers
 
-  initRingBuffer (txRing, tx_buffer, SIZE_TX_BUFFER);
-  initRingBuffer (rxRing, rx_buffer, SIZE_RX_BUFFER);
+    initRingBuffer (txRing, tx_buffer, SIZE_TX_BUFFER);
+    initRingBuffer (rxRing, rx_buffer, SIZE_RX_BUFFER);
 
-  // clear any listeners for received packets
+    // clear any listeners for received packets
 
-  for (i = 0; i < SIZE_LISTENERS; i++) {
-    listener[i] = NULL;
-  }
+    for (i = 0; i < SIZE_LISTENERS; i++) {
+        listener[i] = NULL;
+    }
 
-  // clear statistics counts
+    // clear statistics counts
 
-  clearStats ();
+    clearStats ();
 }
 
 
- /*
-  * \brief Bring the hardware into freeze which drops it off the CAN bus
-  *
-  * \param none
-  *
-  * \retval none
-  *
-  */
+/*
+ * \brief Bring the hardware into freeze which drops it off the CAN bus
+ *
+ * \param none
+ *
+ * \retval none
+ *
+ */
 
 void FlexCAN::end (void)
 {
-  // enter freeze mode
+    // enter freeze mode
 
-  FLEXCANb_MCR (flexcanBase) |= (FLEXCAN_MCR_HALT);
+    FLEXCANb_MCR (flexcanBase) |= (FLEXCAN_MCR_HALT);
 
-  while (!(FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK))
-    ;
+    while (!(FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK))
+        ;
 }
 
- /*
-  * \brief Initializes the CAN bus to the given settings
-  *
-  * \param baud - Set the baud rate of the bus. Only certain values are valid 50000, 100000, 125000, 250000, 500000, 1000000
-  * \param mask - A default mask to use for all mailbox masks. Optional.
-  * \param txAlt - 1 to enable alternate Tx pin (where available)
-  * \param rxAlt - 1 to enable alternate Rx pin (where available)
-  *
-  * \retval none
-  *
-  */
+/*
+ * \brief Initializes the CAN bus to the given settings
+ *
+ * \param baud - Set the baud rate of the bus. Only certain values are valid 50000, 100000, 125000, 250000, 500000, 1000000
+ * \param mask - A default mask to use for all mailbox masks. Optional.
+ * \param txAlt - 1 to enable alternate Tx pin (where available)
+ * \param rxAlt - 1 to enable alternate Rx pin (where available)
+ *
+ * \retval none
+ *
+ */
 
 void FlexCAN::begin (uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uint8_t rxAlt)
 {
@@ -383,11 +382,11 @@ void FlexCAN::setListenOnly (bool mode)
     // enter freeze mode if not already there
 
     if (!(FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK)) {
-       FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_FRZ;
-       FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_HALT;
+        FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_FRZ;
+        FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_HALT;
 
-       while (!(FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK))
-         ;
+        while (!(FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK))
+            ;
     }
 
     if (mode)
@@ -403,16 +402,17 @@ void FlexCAN::setListenOnly (bool mode)
         ;
 }
 
- /*
-  * \brief Initializes mailboxes to the requested mix of Rx and Tx boxes
-  *
-  * \param txboxes - How many of the 8 boxes should be used for Tx
-  *
-  * \retval number of tx boxes set.
-  *
-  */
+/*
+ * \brief Initializes mailboxes to the requested mix of Rx and Tx boxes
+ *
+ * \param txboxes - How many of the 8 boxes should be used for Tx
+ *
+ * \retval number of tx boxes set.
+ *
+ */
 
-uint32_t FlexCAN::setNumTxBoxes (uint32_t txboxes) {
+uint32_t FlexCAN::setNumTxBoxes (uint32_t txboxes)
+{
     uint8_t c;
     uint32_t oldIde;
 
@@ -443,15 +443,15 @@ uint32_t FlexCAN::setNumTxBoxes (uint32_t txboxes) {
     return (numTxMailboxes);
 }
 
- /*
-  * \brief Sets a per-mailbox filter. Sets both the storage and the actual mailbox.
-  *
-  * \param filter - a filled out filter structure
-  * \param mbox - the mailbox to update
-  *
-  * \retval Nothing
-  *
-  */
+/*
+ * \brief Sets a per-mailbox filter. Sets both the storage and the actual mailbox.
+ *
+ * \param filter - a filled out filter structure
+ * \param mbox - the mailbox to update
+ *
+ * \retval Nothing
+ *
+ */
 
 void FlexCAN::setFilter (const CAN_filter_t &filter, uint8_t mbox)
 {
@@ -459,24 +459,24 @@ void FlexCAN::setFilter (const CAN_filter_t &filter, uint8_t mbox)
         MBFilters[mbox] = filter;
 
         if (filter.flags.extended) {
-           FLEXCANb_MBn_ID(flexcanBase, mbox) = (filter.id & FLEXCAN_MB_ID_EXT_MASK);
-           FLEXCANb_MBn_CS(flexcanBase, mbox) |= FLEXCAN_MB_CS_IDE;
+            FLEXCANb_MBn_ID(flexcanBase, mbox) = (filter.id & FLEXCAN_MB_ID_EXT_MASK);
+            FLEXCANb_MBn_CS(flexcanBase, mbox) |= FLEXCAN_MB_CS_IDE;
         } else {
-           FLEXCANb_MBn_ID(flexcanBase, mbox) = FLEXCAN_MB_ID_IDSTD(filter.id);
-           FLEXCANb_MBn_CS(flexcanBase, mbox) &= ~FLEXCAN_MB_CS_IDE;
+            FLEXCANb_MBn_ID(flexcanBase, mbox) = FLEXCAN_MB_ID_IDSTD(filter.id);
+            FLEXCANb_MBn_CS(flexcanBase, mbox) &= ~FLEXCAN_MB_CS_IDE;
         }
     }
 }
 
- /*
-  * \brief Gets a per-mailbox filter.
-  *
-  * \param filter - returned filter structure
-  * \param mbox - mailbox selected
-  *
-  * \retval true if mailbox s valid, false otherwise
-  *
-  */
+/*
+ * \brief Gets a per-mailbox filter.
+ *
+ * \param filter - returned filter structure
+ * \param mbox - mailbox selected
+ *
+ * \retval true if mailbox s valid, false otherwise
+ *
+ */
 
 bool FlexCAN::getFilter (CAN_filter_t &filter, uint8_t mbox)
 {
@@ -507,7 +507,7 @@ void FlexCAN::setMask (uint32_t mask, uint8_t mbox)
         return;
     }
 
-   /* Per mailbox masks can only be set in freeze mode so have to enter that mode if not already there. */
+    /* Per mailbox masks can only be set in freeze mode so have to enter that mode if not already there. */
 
     if (!(FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK)) {
         FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_FRZ;
@@ -622,9 +622,9 @@ int FlexCAN::write (const CAN_message_t &msg)
         }
     }
 
-  // could not send the frame!
+    // could not send the frame!
 
-  return 0;
+    return 0;
 }
 
 /*
@@ -655,7 +655,7 @@ void FlexCAN::writeTxRegisters (const CAN_message_t &msg, uint8_t buffer)
     if (msg.flags.extended) {
         if (msg.flags.remote) {
             FLEXCANb_MBn_CS(flexcanBase, buffer) = FLEXCAN_MB_CS_CODE(FLEXCAN_MB_CODE_TX_ONCE) |
-                                                   FLEXCAN_MB_CS_LENGTH(msg.len) | FLEXCAN_MB_CS_SRR | 
+                                                   FLEXCAN_MB_CS_LENGTH(msg.len) | FLEXCAN_MB_CS_SRR |
                                                    FLEXCAN_MB_CS_IDE | FLEXCAN_MB_CS_RTR;
         } else {
             FLEXCANb_MBn_CS(flexcanBase, buffer) = FLEXCAN_MB_CS_CODE(FLEXCAN_MB_CODE_TX_ONCE) |
@@ -729,7 +729,7 @@ void FlexCAN::readRxRegisters (CAN_message_t& msg, uint8_t buffer)
         dataIn >>=8;
         msg.buf[4] = dataIn;
     }
- 
+
     for (uint32_t loop=msg.len; loop < 8; loop++ ) {
         msg.buf[loop] = 0;
     }
