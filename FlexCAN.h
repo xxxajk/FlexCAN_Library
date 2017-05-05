@@ -79,6 +79,7 @@ public:
     CANListener ();
 
     virtual bool frameHandler (CAN_message_t &frame, int mailbox, uint8_t controller);
+    virtual void txHandler (int mailbox, uint8_t controller);
 
     void attachMBHandler (uint8_t mailBox);
     void detachMBHandler (uint8_t mailBox);
@@ -133,6 +134,7 @@ public:
     void end (void);
     uint32_t available (void);
     int write (const CAN_message_t &msg);
+    int write (const CAN_message_t &msg, uint8_t n);
     int read (CAN_message_t &msg);
     uint32_t rxBufferOverruns (void)
     {

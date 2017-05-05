@@ -590,6 +590,8 @@ int FlexCAN::read (CAN_message_t &msg)
  * \note Will do one of two things - 1. Send the given frame out of the first available mailbox
  * or 2. queue the frame for sending later via interrupt. Automatically turns on TX interrupt
  * if necessary.
+ * Messages may be transmitted out of order, if more than one transmit mailbox is enabled.
+ * The message queue ignores the message priority.
  *
  * Returns whether sending/queueing succeeded. Will not smash the queue if it gets full.
  */
@@ -623,6 +625,31 @@ int FlexCAN::write (const CAN_message_t &msg)
     }
 
     // could not send the frame!
+
+    return 0;
+}
+
+/*
+ * \brief Send a frame out of this canbus port, using a specific mailbox. The TX queue is not used.
+ *
+ * \param msg - the filled out frame structure to use for sending
+ * \param mbox - mailbox selected
+ *
+ * \note If the mailbox is available, the message is placed in the mailbox. The CAN controller
+ * selects the next message to send from all filled transmit mailboxes, based on the priority.
+ * This method allows callers to not use the transmit queue and prioritize messages by using
+ * different mailboxes for different priority levels.
+ * Using the same mailbox for a group of messages enforces the transmit order for this group.
+ *
+ * Returns whether the message was placed in the mailbox for sending.
+ */
+
+int FlexCAN::write (const CAN_message_t &msg, uint8_t mbox)
+{
+    if ((FLEXCANb_MBn_CS(flexcanBase, mbox) & FLEXCAN_MB_CS_CODE_MASK) == FLEXCAN_MB_CS_CODE(FLEXCAN_MB_CODE_TX_INACTIVE)) {
+        writeTxRegisters (msg, mbox);
+        return 1;
+    }
 
     return 0;
 }
@@ -891,7 +918,7 @@ void FlexCAN::message_isr (void)
 
         // skip mailboxes that haven't triggered an interrupt
 
-        if ((status & (1 << i)) == 0) {
+        if ((status & (1UL << i)) == 0) {
             continue;
         }
 
@@ -929,9 +956,9 @@ void FlexCAN::message_isr (void)
 
                     // call the handler if it's active for this mailbox
 
-                    if (thisListener->callbacksActive & (1 << i)) {
+                    if (thisListener->callbacksActive & (1UL << i)) {
                         handledFrame |= thisListener->frameHandler (msg, i, controller);
-                    } else if (thisListener->callbacksActive & (1 << 31)) {
+                    } else if (thisListener->callbacksActive & (1UL << 31)) {
                         handledFrame |= thisListener->frameHandler (msg, -1, controller);
                     }
                 }
@@ -978,12 +1005,22 @@ void FlexCAN::message_isr (void)
             break;
 
         case FLEXCAN_MB_CODE_TX_INACTIVE: // TX inactive. Just chillin' waiting for a message to send. Let's see if we've got one.
-
             // if there is a frame in the queue then send it
 
             if (isRingBufferEmpty (txRing) == false) {
                 if (removeFromRingBuffer (txRing, msg) == true) {
                     writeTxRegisters (msg, i);
+                }
+            } else {
+                for (uint32_t listenerPos = 0; listenerPos < SIZE_LISTENERS; listenerPos++) {
+                    thisListener = listener[listenerPos];
+
+                    // process active listeners
+                    if (thisListener != NULL) {
+                        if (thisListener->callbacksActive & (1UL << i | 1UL << 31)) {
+                            thisListener->txHandler (i, controller);
+                        }
+                    }
                 }
             }
             break;
@@ -1026,7 +1063,6 @@ bool FlexCAN::attachObj (CANListener *listener)
         if (this->listener[i] == NULL) {
             this->listener[i] = listener;
             listener->callbacksActive = 0;
-
             return true;
         }
     }
@@ -1336,6 +1372,19 @@ bool CANListener::frameHandler (CAN_message_t &frame, int mailbox, uint8_t contr
 }
 
 /*
+ * \brief Default CAN transmission completed handler.
+ *
+ * \param mailbox - transmit mailbox that is now available.
+ * \param controller - controller number.
+ *
+ */
+
+void CANListener::txHandler (int mailbox, uint8_t controller)
+{
+
+}
+
+/*
  * \brief Indicate mailbox has an active callback.
  *
  * \param mailBox - mailbox number.
@@ -1363,7 +1412,7 @@ void CANListener::attachMBHandler (uint8_t mailBox)
 void CANListener::detachMBHandler (uint8_t mailBox)
 {
     if ((mailBox >= 0) && (mailBox < NUM_MAILBOXES)) {
-        callbacksActive &= ~(1L << mailBox);
+        callbacksActive &= ~(1UL << mailBox);
     }
 }
 
@@ -1378,7 +1427,7 @@ void CANListener::detachMBHandler (uint8_t mailBox)
 
 void CANListener::attachGeneralHandler (void)
 {
-    callbacksActive |= (1L << 31);
+    callbacksActive |= (1UL << 31);
 }
 
 /*
@@ -1392,5 +1441,5 @@ void CANListener::attachGeneralHandler (void)
 
 void CANListener::detachGeneralHandler (void)
 {
-    callbacksActive &= ~(1L << 31);
+    callbacksActive &= ~(1UL << 31);
 }
