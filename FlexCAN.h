@@ -107,6 +107,7 @@ private:
     volatile CAN_message_t tx_buffer[SIZE_TX_BUFFER];
     ringbuffer_t rxRing;
     volatile CAN_message_t rx_buffer[SIZE_RX_BUFFER];
+    bool IrqEnabled;
 
     void writeTxRegisters (const CAN_message_t &msg, uint8_t buffer);
     void readRxRegisters (CAN_message_t &msg, uint8_t buffer);
@@ -117,6 +118,20 @@ private:
     bool isRingBufferEmpty (ringbuffer_t &ring);
     uint32_t ringBufferCount (ringbuffer_t &ring);
 
+    void irqLock() { IrqEnabled=NVIC_IS_ENABLED(IRQ_CAN_MESSAGE); NVIC_DISABLE_IRQ(IRQ_CAN_MESSAGE); }
+    void irqRelease() { if (IrqEnabled) NVIC_ENABLE_IRQ(IRQ_CAN_MESSAGE); }
+    
+    void setPins(uint8_t txAlt, uint8_t rxAlt);
+    void setBaudRate(uint32_t baud);
+    void softReset();
+    void halt();
+    void exitHalt();
+    void freeze();
+    void waitFrozen();
+    void waitNotFrozen();
+    void waitReady();
+    bool isFrozen();
+    
 #ifdef COLLECT_CAN_STATS
     CAN_stats_t stats;
 #endif
@@ -169,6 +184,8 @@ public:
     //int watchForRange(uint32_t id1, uint32_t id2); //try to allow the range from id1 to id2 - automatically determine base ID and mask
 
     uint32_t setNumTxBoxes (uint32_t txboxes);
+    // Obsolete, for compatibility with version provided with Teensyduino
+    uint32_t setNumTXBoxes (uint32_t txboxes) { return setNumTxBoxes(txboxes); }
 
     void message_isr (void);
     void bus_off_isr (void);

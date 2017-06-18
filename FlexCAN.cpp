@@ -90,6 +90,8 @@ FlexCAN::FlexCAN (uint8_t id)
 {
     uint32_t i;
 
+    numTxMailboxes=2;
+    
     flexcanBase = FLEXCAN0_BASE;
 
 #if defined (INCLUDE_FLEXCAN_CAN1)
@@ -133,7 +135,7 @@ FlexCAN::FlexCAN (uint8_t id)
 void FlexCAN::end (void)
 {
     // enter freeze mode
-
+    halt();
     FLEXCANb_MCR (flexcanBase) |= (FLEXCAN_MCR_HALT);
 
     while (!(FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK))
@@ -156,6 +158,96 @@ void FlexCAN::begin (uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uin
 {
     // set up the pins
 
+    setPins(txAlt,rxAlt);
+
+    // select clock source 16MHz xtal
+
+    OSC0_CR |= OSC_ERCLKEN;
+
+    if (flexcanBase == FLEXCAN0_BASE) {
+        SIM_SCGC6 |=  SIM_SCGC6_FLEXCAN0;
+#if defined(INCLUDE_FLEXCAN_CAN1)
+    } else if (flexcanBase == FLEXCAN1_BASE) {
+        SIM_SCGC3 |=  SIM_SCGC3_FLEXCAN1;
+#endif
+    }
+
+    FLEXCANb_CTRL1(flexcanBase) &= ~FLEXCAN_CTRL_CLK_SRC;
+
+    // enable CAN
+
+    FLEXCANb_MCR (flexcanBase) |=  FLEXCAN_MCR_FRZ;
+    FLEXCANb_MCR (flexcanBase) &= ~FLEXCAN_MCR_MDIS;
+
+    while (FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_LPM_ACK)
+        ;
+
+    // soft reset
+    
+    softReset();
+
+    // wait for freeze ack
+
+    waitFrozen();
+
+    // disable self-reception
+
+    FLEXCANb_MCR (flexcanBase) |= FLEXCAN_MCR_SRX_DIS;
+
+    setBaudRate(baud);
+
+    // enable per-mailbox filtering
+
+    FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_IRMQ;
+
+    // now have to set mask and filter for all the Rx mailboxes or they won't receive anything by default.
+
+    for (uint8_t c = 0; c < NUM_MAILBOXES - numTxMailboxes; c++) {
+        setMask (0, c);
+        setFilter (mask, c);
+    }
+
+    // start the CAN
+    
+    exitHalt();
+    waitReady();
+
+    setNumTxBoxes (2);
+
+#if defined(__MK20DX256__)
+    NVIC_SET_PRIORITY (IRQ_CAN_MESSAGE, IRQ_PRIORITY);
+    NVIC_ENABLE_IRQ (IRQ_CAN_MESSAGE);
+#elif defined(__MK64FX512__)
+    NVIC_SET_PRIORITY (IRQ_CAN0_MESSAGE, IRQ_PRIORITY);
+    NVIC_ENABLE_IRQ (IRQ_CAN0_MESSAGE);
+#elif defined(__MK66FX1M0__)
+    if (flexcanBase == FLEXCAN0_BASE) {
+        NVIC_SET_PRIORITY (IRQ_CAN0_MESSAGE, IRQ_PRIORITY);
+        NVIC_ENABLE_IRQ (IRQ_CAN0_MESSAGE);
+    } else {
+        NVIC_SET_PRIORITY (IRQ_CAN1_MESSAGE, IRQ_PRIORITY);
+        NVIC_ENABLE_IRQ (IRQ_CAN1_MESSAGE);
+    }
+#endif
+
+    // enable interrupt masks for all 16 mailboxes
+
+    FLEXCANb_IMASK1 (flexcanBase) = 0xFFFF;
+
+    dbg_println ("CAN initialized properly");
+}
+
+/*
+ * \brief Initialized CAN pin definitions.
+ *
+ * \param txAlt - Atrenate tx pin
+ * \param rxAlt - Alternate rx pin
+ *
+ * \retval None.
+ *
+ */
+
+void FlexCAN::setPins(uint8_t txAlt, uint8_t rxAlt) {
     if (flexcanBase == FLEXCAN0_BASE) {
         dbg_println ("Begin setup of CAN0");
 
@@ -202,57 +294,29 @@ void FlexCAN::begin (uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uin
         CORE_PIN34_CONFIG = PORT_PCR_MUX(2);// | PORT_PCR_PE | PORT_PCR_PS;
     }
 #endif
+}
 
-    // select clock source 16MHz xtal
+/*
+ * \brief Intializes bus baud rate setting.
+ *
+ * \param baud - desired baud rate
+ *
+ * \retval None.
+ *
+  now using a system that tries to automatically generate a viable baud setting.
+  Bear these things in mind:
+  - The master clock is 16Mhz
+  - You can freely divide it by anything from 1 to 256
+  - There is always a start bit (+1)
+  - The rest (prop, seg1, seg2) are specified 1 less than their actual value (aka +1)
+  - This gives the low end bit timing as 5 (1 + 1 + 2 + 1) and the high end 25 (1 + 8 + 8 + 8)
+  A worked example: 16Mhz clock, divisor = 19+1, bit values add up to 16 = 16Mhz / 20 / 16 = 50k baud
+*/
 
-    OSC0_CR |= OSC_ERCLKEN;
-
-    if (flexcanBase == FLEXCAN0_BASE) {
-        SIM_SCGC6 |=  SIM_SCGC6_FLEXCAN0;
-#if defined(INCLUDE_FLEXCAN_CAN1)
-    } else if (flexcanBase == FLEXCAN1_BASE) {
-        SIM_SCGC3 |=  SIM_SCGC3_FLEXCAN1;
-#endif
-    }
-
-    FLEXCANb_CTRL1(flexcanBase) &= ~FLEXCAN_CTRL_CLK_SRC;
-
-    // enable CAN
-
-    FLEXCANb_MCR (flexcanBase) |=  FLEXCAN_MCR_FRZ;
-    FLEXCANb_MCR (flexcanBase) &= ~FLEXCAN_MCR_MDIS;
-
-    while (FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_LPM_ACK)
-        ;
-
-    // soft reset
-
-    FLEXCANb_MCR (flexcanBase) ^=  FLEXCAN_MCR_SOFT_RST;
-
-    while (FLEXCANb_MCR (flexcanBase) & FLEXCAN_MCR_SOFT_RST)
-        ;
-
-    // wait for freeze ack
-
-    while (!(FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK))
-        ;
-
-    // disable self-reception
-
-    FLEXCANb_MCR (flexcanBase) |= FLEXCAN_MCR_SRX_DIS;
-
-    /*
-      now using a system that tries to automatically generate a viable baud setting.
-      Bear these things in mind:
-      - The master clock is 16Mhz
-      - You can freely divide it by anything from 1 to 256
-      - There is always a start bit (+1)
-      - The rest (prop, seg1, seg2) are specified 1 less than their actual value (aka +1)
-      - This gives the low end bit timing as 5 (1 + 1 + 2 + 1) and the high end 25 (1 + 8 + 8 + 8)
-      A worked example: 16Mhz clock, divisor = 19+1, bit values add up to 16 = 16Mhz / 20 / 16 = 50k baud
-    */
-
+void FlexCAN::setBaudRate(uint32_t baud) {
     // have to find a divisor that ends up as close to the target baud as possible while keeping the end result between 5 and 25
+
+    dbg_println ("Set baud rate");
 
     uint32_t divisor = 0;
     uint32_t bestDivisor = 0;
@@ -305,67 +369,135 @@ void FlexCAN::begin (uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uin
 
     // baud rate debug information
 
-    dbg_println ("Bit time values:");
-    dbg_print ("Prop = ");
+    dbg_println (" Bit time values:");
+    dbg_print ("  Prop = ");
     dbg_println (propSeg + 1);
-    dbg_print ("Seg1 = ");
+    dbg_print ("  Seg1 = ");
     dbg_println (pSeg1 + 1);
-    dbg_print ("Seg2 = ");
+    dbg_print ("  Seg2 = ");
     dbg_println (pSeg2 + 1);
-    dbg_print ("Divisor = ");
+    dbg_print ("  Divisor = ");
     dbg_println (divisor + 1);
 
     FLEXCANb_CTRL1 (flexcanBase) = (FLEXCAN_CTRL_PROPSEG(propSeg) | FLEXCAN_CTRL_RJW(1) | FLEXCAN_CTRL_ERR_MSK |
                                     FLEXCAN_CTRL_PSEG1(pSeg1) | FLEXCAN_CTRL_PSEG2(pSeg2) | FLEXCAN_CTRL_PRESDIV(divisor));
+}
 
-    // enable per-mailbox filtering
+/*
+ * \brief Halts CAN bus.
+ *
+ * \param None.
+ *
+ * \retval None.
+ *
+ */
 
-    FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_IRMQ;
+void FlexCAN::halt() {
+    FLEXCANb_MCR(flexcanBase) |= (FLEXCAN_MCR_HALT);
+    waitFrozen();
+}
 
-    // now have to set mask and filter for all the Rx mailboxes or they won't receive anything by default.
+/*
+ * \brief Exits from hat state.
+ *
+ * \param None.
+ *
+ * \retval None.
+ *
+ */
 
-    for (uint8_t c = 0; c < NUM_MAILBOXES - numTxMailboxes; c++) {
-        setMask (0, c);
-        setFilter (mask, c);
-    }
+void FlexCAN::exitHalt() {
+    // exit freeze mode and wait until it is unfrozen.
 
-    // start the CAN
-
+    dbg_println ("Exit halt");
     FLEXCANb_MCR(flexcanBase) &= ~(FLEXCAN_MCR_HALT);
+    waitNotFrozen();
+}
 
-    // wait till exit of freeze mode
+/*
+ * \brief Makes CAN bus soft reset.
+ *
+ * \param None.
+ *
+ * \retval None.
+ *
+ */
 
-    while (FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK)
-        ;
+void FlexCAN::softReset() {
+  dbg_println ("Soft reset");
+  FLEXCANb_MCR (flexcanBase) ^=  FLEXCAN_MCR_SOFT_RST;
 
-    // wait till ready
+  while (FLEXCANb_MCR (flexcanBase) & FLEXCAN_MCR_SOFT_RST)
+      ;
+}
 
-    while (FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_NOT_RDY)
-        ;
+/*
+ * \brief Freezes CAN bus.
+ *
+ * \param None.
+ *
+ * \retval None.
+ *
+ */
 
-    setNumTxBoxes (2);
+void FlexCAN::freeze() {
+  FLEXCANb_MCR(flexcanBase) |= FLEXCAN_MCR_FRZ;
+}
 
-#if defined(__MK20DX256__)
-    NVIC_SET_PRIORITY (IRQ_CAN_MESSAGE, IRQ_PRIORITY);
-    NVIC_ENABLE_IRQ (IRQ_CAN_MESSAGE);
-#elif defined(__MK64FX512__)
-    NVIC_SET_PRIORITY (IRQ_CAN0_MESSAGE, IRQ_PRIORITY);
-    NVIC_ENABLE_IRQ (IRQ_CAN0_MESSAGE);
-#elif defined(__MK66FX1M0__)
-    if (flexcanBase == FLEXCAN0_BASE) {
-        NVIC_SET_PRIORITY (IRQ_CAN0_MESSAGE, IRQ_PRIORITY);
-        NVIC_ENABLE_IRQ (IRQ_CAN0_MESSAGE);
-    } else {
-        NVIC_SET_PRIORITY (IRQ_CAN1_MESSAGE, IRQ_PRIORITY);
-        NVIC_ENABLE_IRQ (IRQ_CAN1_MESSAGE);
-    }
-#endif
+/*
+ * \brief Waits until CAN bus is frozen
+ *
+ * \param None.
+ *
+ * \retval None.
+ *
+ */
 
-    // enable interrupt masks for all 16 mailboxes
+void FlexCAN::waitFrozen() {
+  // wait for freeze ack
+  dbg_println ("Wait frozen");
+  while (!isFrozen());
+}
 
-    FLEXCANb_IMASK1 (flexcanBase) = 0xFFFF;
+/*
+ * \brief Waits until CAN bus is not frozen.
+ *
+ * \param None.
+ *
+ * \retval None.
+ *
+ */
 
-    dbg_println ("CAN initialized properly");
+void FlexCAN::waitNotFrozen() {
+  // wait for freeze ack
+  dbg_println ("Wait not frozen");
+  while (isFrozen());
+}
+
+/*
+ * \brief Waits until CAN bus is ready
+ *
+ * \param None.
+ *
+ * \retval None.
+ *
+ */
+
+void FlexCAN::waitReady() {
+  while (FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_NOT_RDY);
+}
+
+/*
+ * \brief Tests is CAN bus frozen.
+ *
+ * \param None.
+ *
+ * \retval true, if CAN bus is frozen.
+ *
+ */
+
+bool FlexCAN::isFrozen() {
+  return (FLEXCANb_MCR(flexcanBase) & FLEXCAN_MCR_FRZ_ACK);
 }
 
 /*
@@ -537,7 +669,11 @@ void FlexCAN::setMask (uint32_t mask, uint8_t mbox)
 
 uint32_t FlexCAN::available (void)
 {
-    return (ringBufferCount (rxRing));
+    irqLock();
+    uint32_t result=(ringBufferCount (rxRing));
+    irqRelease();
+    
+    return result;
 }
 
 /*
@@ -575,11 +711,16 @@ int FlexCAN::read (CAN_message_t &msg)
 {
     /* pull the next available message from the ring */
 
+    int result=0;
+    
+    irqLock();
     if (removeFromRingBuffer (rxRing, msg) == true) {
-        return 1;
+        result=1;
     }
 
-    return 0;
+    irqRelease();
+
+    return result;
 }
 
 /*
@@ -599,34 +740,35 @@ int FlexCAN::read (CAN_message_t &msg)
 int FlexCAN::write (const CAN_message_t &msg)
 {
     uint32_t index;
+    int result=0;
+
+    irqLock();
 
     // find an available buffer
 
-    int buffer = -1;
-
     for (index = NUM_MAILBOXES - numTxMailboxes - 1; index < NUM_MAILBOXES; index++) {
         if ((FLEXCANb_MBn_CS(flexcanBase, index) & FLEXCAN_MB_CS_CODE_MASK) == FLEXCAN_MB_CS_CODE(FLEXCAN_MB_CODE_TX_INACTIVE)) {
-            buffer = index;
             break;// found one
         }
     }
 
-    if (buffer > -1) {
+    if (index < NUM_MAILBOXES) {
         dbg_println ("Writing a frame directly.");
 
-        writeTxRegisters (msg, buffer);
-        return 1;
+        writeTxRegisters (msg, index);
+        result=1;
     } else {
         // no mailboxes available. Try to buffer it
 
         if (addToRingBuffer (txRing, msg) == true) {
-            return 1;
+            result=1;
         }
+       // else could not send the frame!
     }
 
-    // could not send the frame!
+    irqRelease();
 
-    return 0;
+    return result;
 }
 
 /*
@@ -646,12 +788,16 @@ int FlexCAN::write (const CAN_message_t &msg)
 
 int FlexCAN::write (const CAN_message_t &msg, uint8_t mbox)
 {
+    int result=0;
+    
+    irqLock();
     if ((FLEXCANb_MBn_CS(flexcanBase, mbox) & FLEXCAN_MB_CS_CODE_MASK) == FLEXCAN_MB_CS_CODE(FLEXCAN_MB_CODE_TX_INACTIVE)) {
         writeTxRegisters (msg, mbox);
-        return 1;
+        result=1;
     }
+    irqRelease();
 
-    return 0;
+    return result;
 }
 
 /*
