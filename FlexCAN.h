@@ -8,6 +8,9 @@
 
 #include <Arduino.h>
 
+#define FlexCAN_MAILBOX_TX_BUFFER_SUPPORT  // helper definition for handling different FlexCAN revisions
+#define FlexCAN_DYNAMIC_BUFFER_SUPPORT  // helper definition for handling different FlexCAN revisions
+
 #if !defined(SIZE_RX_BUFFER)
 #define SIZE_RX_BUFFER  32 // receive incoming ring buffer size
 #endif
@@ -104,9 +107,11 @@ private:
     CANListener *listener[SIZE_LISTENERS];
 
     ringbuffer_t txRing;
-    volatile CAN_message_t tx_buffer[SIZE_TX_BUFFER];
+    volatile CAN_message_t *tx_buffer;
     ringbuffer_t rxRing;
-    volatile CAN_message_t rx_buffer[SIZE_RX_BUFFER];
+    volatile CAN_message_t *rx_buffer;
+    ringbuffer_t * txRings[NUM_MAILBOXES];
+    
     bool IrqEnabled;
 
     void writeTxRegisters (const CAN_message_t &msg, uint8_t buffer);
@@ -121,6 +126,8 @@ private:
     void irqLock() { IrqEnabled=NVIC_IS_ENABLED(IRQ_CAN_MESSAGE); NVIC_DISABLE_IRQ(IRQ_CAN_MESSAGE); }
     void irqRelease() { if (IrqEnabled) NVIC_ENABLE_IRQ(IRQ_CAN_MESSAGE); }
     
+    void initializeBuffers();
+    bool isInitialized() { return tx_buffer!=0; }
     void setPins(uint8_t txAlt, uint8_t rxAlt);
     void setBaudRate(uint32_t baud);
     void softReset();
@@ -132,15 +139,37 @@ private:
     void waitReady();
     bool isFrozen();
     
+    bool usesGlobalTxRing(uint8_t mbox) { return (mbox<getNumMailBoxes()?txRings[mbox]==0:true); }
+    bool isTxBox(uint8_t mbox) { return (mbox>=getFirstTxBox() && mbox<getNumMailBoxes() ); }
+    
 #ifdef COLLECT_CAN_STATS
     CAN_stats_t stats;
 #endif
 
 protected:
     uint8_t numTxMailboxes;
+    uint16_t sizeRxBuffer;
+    uint16_t sizeTxBuffer;
 
 public:
     FlexCAN (uint8_t id = 0);
+    
+    // Before begin, you can define rx buffer size. Default is SIZE_RX_BUFFER. This does not have effect after begin.
+    void setRxBufferSize(uint16_t size) { if (!isInitialized() ) sizeRxBuffer=size; }
+    
+    // Before begin, you can define global tx buffer size. Default is SIZE_TX_BUFFER. This does not have effect after begin.
+    void setTxBufferSize(uint16_t size) { if (!isInitialized() ) sizeTxBuffer=size; }
+    
+    // You can define mailbox specific tx buffer size. This can be defined only once per mailbox.
+    // As default prioritized messages will not be buffered. If you define buffer size for mail box, the messages will be
+    // buffered to own buffer, if necessary.
+    void setMailBoxTxBufferSize(uint8_t mbox, uint16_t size);
+
+    inline uint8_t getFirstTxBox() { return getNumMailBoxes()-numTxMailboxes; }
+    inline uint8_t getLastTxBox() { return getNumMailBoxes()-1; }
+    inline uint8_t getNumMailBoxes() { return NUM_MAILBOXES; }
+    inline uint8_t getNumRxBoxes() { return getNumMailBoxes()-numTxMailboxes; }
+    
     void begin (uint32_t baud = 250000, const CAN_filter_t &mask = defaultMask, uint8_t txAlt = 0, uint8_t rxAlt = 0);
 
     void setFilter (const CAN_filter_t &filter, uint8_t n);
@@ -183,9 +212,9 @@ public:
     //int watchFor(uint32_t id, uint32_t mask); //allow a range of ids through
     //int watchForRange(uint32_t id1, uint32_t id2); //try to allow the range from id1 to id2 - automatically determine base ID and mask
 
-    uint32_t setNumTxBoxes (uint32_t txboxes);
+    uint8_t setNumTxBoxes (uint8_t txboxes);
     // Obsolete, for compatibility with version provided with Teensyduino
-    uint32_t setNumTXBoxes (uint32_t txboxes) { return setNumTxBoxes(txboxes); }
+    uint8_t setNumTXBoxes (uint8_t txboxes) { return setNumTxBoxes(txboxes); }
 
     void message_isr (void);
     void bus_off_isr (void);
