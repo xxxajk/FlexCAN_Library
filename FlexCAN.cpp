@@ -99,6 +99,7 @@ FlexCAN::FlexCAN (uint8_t id)
         flexcanBase = FLEXCAN1_BASE;
     }
 #else
+    (void)id; // Just for avoid warning.
 #endif
 
     // Default mask is allow everything
