@@ -98,6 +98,7 @@ FlexCAN::FlexCAN (uint8_t id)
     if (id > 0)  {
         flexcanBase = FLEXCAN1_BASE;
     }
+#else
 #endif
 
     // Default mask is allow everything
@@ -1560,7 +1561,7 @@ CANListener::CANListener ()
  *
  */
 
-bool CANListener::frameHandler (CAN_message_t &frame, int mailbox, uint8_t controller)
+bool CANListener::frameHandler (CAN_message_t &/*frame*/, int /*mailbox*/, uint8_t /*controller*/)
 {
 
     /* default implementation that doesn't handle frames */
@@ -1576,7 +1577,7 @@ bool CANListener::frameHandler (CAN_message_t &frame, int mailbox, uint8_t contr
  *
  */
 
-void CANListener::txHandler (int mailbox, uint8_t controller)
+void CANListener::txHandler (int /*mailbox*/, uint8_t /*controller*/)
 {
 
 }
@@ -1592,7 +1593,7 @@ void CANListener::txHandler (int mailbox, uint8_t controller)
 
 void CANListener::attachMBHandler (uint8_t mailBox)
 {
-    if ((mailBox >= 0) && (mailBox < NUM_MAILBOXES)) {
+    if ( (mailBox < NUM_MAILBOXES) ) {
         callbacksActive |= (1L << mailBox);
     }
 }
@@ -1608,7 +1609,7 @@ void CANListener::attachMBHandler (uint8_t mailBox)
 
 void CANListener::detachMBHandler (uint8_t mailBox)
 {
-    if ((mailBox >= 0) && (mailBox < NUM_MAILBOXES)) {
+    if ( (mailBox < NUM_MAILBOXES) ) {
         callbacksActive &= ~(1UL << mailBox);
     }
 }
