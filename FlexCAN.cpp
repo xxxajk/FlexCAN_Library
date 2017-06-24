@@ -102,6 +102,18 @@ FlexCAN::FlexCAN (uint8_t id)
     (void)id; // Just for avoid warning.
 #endif
 
+#if defined(__MK20DX256__)
+    IrqMessage=IRQ_CAN_MESSAGE;
+#elif defined(__MK64FX512__)
+    IrqMessage=IRQ_CAN0_MESSAGE;
+#elif defined(__MK66FX1M0__)
+    if (flexcanBase == FLEXCAN0_BASE) {
+      IrqMessage=IRQ_CAN0_MESSAGE;
+    } else {
+      IrqMessage=IRQ_CAN1_MESSAGE;
+    }
+#endif
+
     // Default mask is allow everything
 
     defaultMask.flags.remote = 0;
@@ -222,21 +234,8 @@ void FlexCAN::begin (uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uin
 
     setNumTxBoxes (numTxMailboxes);
 
-#if defined(__MK20DX256__)
-    NVIC_SET_PRIORITY (IRQ_CAN_MESSAGE, IRQ_PRIORITY);
-    NVIC_ENABLE_IRQ (IRQ_CAN_MESSAGE);
-#elif defined(__MK64FX512__)
-    NVIC_SET_PRIORITY (IRQ_CAN0_MESSAGE, IRQ_PRIORITY);
-    NVIC_ENABLE_IRQ (IRQ_CAN0_MESSAGE);
-#elif defined(__MK66FX1M0__)
-    if (flexcanBase == FLEXCAN0_BASE) {
-        NVIC_SET_PRIORITY (IRQ_CAN0_MESSAGE, IRQ_PRIORITY);
-        NVIC_ENABLE_IRQ (IRQ_CAN0_MESSAGE);
-    } else {
-        NVIC_SET_PRIORITY (IRQ_CAN1_MESSAGE, IRQ_PRIORITY);
-        NVIC_ENABLE_IRQ (IRQ_CAN1_MESSAGE);
-    }
-#endif
+    NVIC_SET_PRIORITY (IrqMessage, IRQ_PRIORITY);
+    NVIC_ENABLE_IRQ (IrqMessage);
 
     // enable interrupt masks for all 16 mailboxes
 
