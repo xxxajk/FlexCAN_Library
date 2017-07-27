@@ -57,7 +57,7 @@
 #define                          FLEXCAN0_RXFGMASK (*(volatile uint32_t*)(FLEXCAN0_BASE+0x48))
 #define                             FLEXCAN0_RXFIR (*(volatile uint32_t*)(FLEXCAN0_BASE+0x4C))
 
-#if defined(KINETISKE) 
+#if defined(KINETISKE)
 #define                               FLEXCAN0_CBT (*(volatile uint32_t *)(FLEXCAN0_BASE+0x50))
 #else
 #define                              FLEXCAN0_DBG1 (*(volatile uint32_t*)(FLEXCAN0_BASE+0x58))

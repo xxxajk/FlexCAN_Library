@@ -162,7 +162,7 @@ void FlexCAN::begin(uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uint
         setPins(txAlt, rxAlt);
 
 #if defined(F_CAN)
-// Clocking should be already set up, already enabled elsewhere.
+        // Clocking should be already set up, already enabled elsewhere.
 #else
         // select clock source 16MHz xtal
 
@@ -280,9 +280,9 @@ void FlexCAN::setPins(uint8_t txAlt, uint8_t rxAlt) {
         if(flexcanBase == FLEXCAN0_BASE) {
                 dbg_println("Begin setup of CAN0");
 #if defined(KINETISKE)
-        // TO-DO: No alt yet. This is the programming interface default.
-        CORE_PIN3_CONFIG = PORT_PCR_MUX(5);
-        CORE_PIN4_CONFIG = PORT_PCR_MUX(5);
+                // TO-DO: No alt yet. This is the programming interface default.
+                CORE_PIN3_CONFIG = PORT_PCR_MUX(5);
+                CORE_PIN4_CONFIG = PORT_PCR_MUX(5);
 #elif defined(__MK66FX1M0__) || defined(__MK64FX512__)
                 //  3=PTA12=CAN0_TX,  4=PTA13=CAN0_RX (default)
                 // 29=PTB18=CAN0_TX, 30=PTB19=CAN0_RX (alternative)
