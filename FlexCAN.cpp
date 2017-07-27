@@ -7,21 +7,6 @@
 // Statistics collection, timestamp and code clean-up my mdapoz
 //
 #include "FlexCAN.h"
-#include "kinetis_flexcan.h"
-
-#define                             FLEXCANb_MCR(b) (*(vuint32_t*)(b))
-#define                           FLEXCANb_CTRL1(b) (*(vuint32_t*)(b+4))
-#define                        FLEXCANb_RXMGMASK(b) (*(vuint32_t*)(b+0x10))
-#define                          FLEXCANb_IFLAG1(b) (*(vuint32_t*)(b+0x30))
-#define                          FLEXCANb_IMASK1(b) (*(vuint32_t*)(b+0x28))
-#define                        FLEXCANb_RXFGMASK(b) (*(vuint32_t*)(b+0x48))
-#define                       FLEXCANb_MBn_CS(b, n) (*(vuint32_t*)(b+0x80+n*0x10))
-#define                       FLEXCANb_MBn_ID(b, n) (*(vuint32_t*)(b+0x84+n*0x10))
-#define                    FLEXCANb_MBn_WORD0(b, n) (*(vuint32_t*)(b+0x88+n*0x10))
-#define                    FLEXCANb_MBn_WORD1(b, n) (*(vuint32_t*)(b+0x8C+n*0x10))
-#define                    FLEXCANb_IDFLT_TAB(b, n) (*(vuint32_t*)(b+0xE0+(n*4)))
-#define                      FLEXCANb_MB_MASK(b, n) (*(vuint32_t*)(b+0x880+(n*4)))
-#define                            FLEXCANb_ESR1(b) (*(vuint32_t*)(b+0x20))
 
 #if defined(__MK66FX1M0__)
 #define INCLUDE_FLEXCAN_CAN1
@@ -176,6 +161,9 @@ void FlexCAN::begin(uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uint
 
         setPins(txAlt, rxAlt);
 
+#if defined(F_CAN)
+// Clocking should be already set up, already enabled elsewhere.
+#else
         // select clock source 16MHz xtal
 
         OSC0_CR |= OSC_ERCLKEN;
@@ -187,8 +175,9 @@ void FlexCAN::begin(uint32_t baud, const CAN_filter_t &mask, uint8_t txAlt, uint
                 SIM_SCGC3 |= SIM_SCGC3_FLEXCAN1;
 #endif
         }
+#endif
 
-        FLEXCANb_CTRL1(flexcanBase) &= ~FLEXCAN_CTRL_CLK_SRC;
+        FLEXCANb_CTRL1_SETUP(flexcanBase);
 
         // enable CAN
 
@@ -290,8 +279,11 @@ void FlexCAN::initializeBuffers() {
 void FlexCAN::setPins(uint8_t txAlt, uint8_t rxAlt) {
         if(flexcanBase == FLEXCAN0_BASE) {
                 dbg_println("Begin setup of CAN0");
-
-#if defined(__MK66FX1M0__) || defined(__MK64FX512__)
+#if defined(KINETISKE)
+        // TO-DO: No alt yet. This is the programming interface default.
+        CORE_PIN3_CONFIG = PORT_PCR_MUX(5);
+        CORE_PIN4_CONFIG = PORT_PCR_MUX(5);
+#elif defined(__MK66FX1M0__) || defined(__MK64FX512__)
                 //  3=PTA12=CAN0_TX,  4=PTA13=CAN0_RX (default)
                 // 29=PTB18=CAN0_TX, 30=PTB19=CAN0_RX (alternative)
 
@@ -360,16 +352,16 @@ void FlexCAN::setBaudRate(uint32_t baud) {
 
         uint32_t divisor = 0;
         uint32_t bestDivisor = 0;
-        uint32_t result = 16000000 / baud / (divisor + 1);
-        int error = baud - (16000000 / (result * (divisor + 1)));
+        uint32_t result = FLEXCAN_BASE_FREQ / baud / (divisor + 1);
+        int error = baud - (FLEXCAN_BASE_FREQ / (result * (divisor + 1)));
         int bestError = error;
 
         while(result > 5) {
                 divisor++;
-                result = 16000000 / baud / (divisor + 1);
+                result = FLEXCAN_BASE_FREQ / baud / (divisor + 1);
 
                 if(result <= 25) {
-                        error = baud - (16000000 / (result * (divisor + 1)));
+                        error = baud - (FLEXCAN_BASE_FREQ / (result * (divisor + 1)));
 
                         if(error < 0)
                                 error *= -1;
@@ -395,7 +387,7 @@ void FlexCAN::setBaudRate(uint32_t baud) {
         }
 
         divisor = bestDivisor;
-        result = 16000000 / baud / (divisor + 1);
+        result = FLEXCAN_BASE_FREQ / baud / (divisor + 1);
 
         if((result < 5) || (result > 25) || (bestError > 300)) {
                 Serial.println("Abort in CAN begin. Couldn't find a suitable baud config!");

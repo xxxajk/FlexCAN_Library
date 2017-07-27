@@ -7,6 +7,7 @@
 #define __FLEXCAN_H__
 
 #include <Arduino.h>
+#include "kinetis_flexcan.h"
 
 #define FlexCAN_MAILBOX_TX_BUFFER_SUPPORT  // helper definition for handling different FlexCAN revisions
 #define FlexCAN_DYNAMIC_BUFFER_SUPPORT  // helper definition for handling different FlexCAN revisions
