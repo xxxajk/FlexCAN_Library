@@ -23,6 +23,7 @@
 *.RTF	 diff=astextplain
 
 *.jpg -text -diff
+*.png binary
 
 *.zip binary
 
